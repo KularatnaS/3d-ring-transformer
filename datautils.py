@@ -1,19 +1,31 @@
 import numpy as np
 from scipy.sparse import csr_matrix
 import laspy
+from sklearn.neighbors import NearestNeighbors
 
 
-def save_as_laz_file(points, filename):
+def save_as_laz_file(points, filename, classification=None):
     las = laspy.create(file_version="1.4", point_format=6)
     las.x = points[:, 0]
     las.y = points[:, 1]
     las.z = points[:, 2]
+
+    if classification is not None:
+        las.classification = classification
     las.write(filename)
 
 
-def get_points_from_laz_file(laz_file):
+def get_data_from_laz_file(laz_file, classification=True):
     las = laspy.read(laz_file)
-    return np.vstack((las.x, las.y, las.z)).transpose()
+    x = las.x
+    y = las.y
+    z = las.z
+
+    if classification:
+        classification = las.classification
+        return np.stack([x, y, z], axis=1), classification
+    else:
+        return np.stack([x, y, z], axis=1)
 
 
 def down_sample_point_data(voxel_size, pc_input):
@@ -57,3 +69,18 @@ def down_sample_point_data(voxel_size, pc_input):
     pc_down_sampled = np.asarray((sparse_matrix @ pc_input) / denominator)
 
     return pc_down_sampled, voxel_map
+
+
+def get_down_sampled_points_and_classification(points, classification, voxel_size):
+    down_sampled_points, _ = down_sample_point_data(voxel_size, points)
+    neighbours = NearestNeighbors(n_neighbors=1, algorithm='auto').fit(points)
+    _, indices = neighbours.kneighbors(down_sampled_points)
+    down_sampled_classification = classification[indices.flatten()]
+
+    return down_sampled_points, down_sampled_classification
+
+
+# points, classification = get_data_from_laz_file("train-data/pc_46_0_out.laz")
+# down_sampled_points, down_sampled_classification = get_down_sampled_points_and_classification(points, classification,
+#                                                                                               0.08)
+# save_as_laz_file(down_sampled_points, "test.laz", down_sampled_classification)

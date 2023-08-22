@@ -9,5 +9,6 @@ def get_config():
             "model_resolution": 0.08,
             "max_points_per_bubble": max_points_per_bubble,
             "rings_per_bubble": rings_per_bubble,
-            "points_per_ring": points_per_ring
+            "points_per_ring": points_per_ring,
+            "max_ring_radius": 0.5,
         }

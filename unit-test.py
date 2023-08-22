@@ -4,7 +4,7 @@ import tempfile
 import numpy as np
 import laspy
 
-from datautils import get_points_from_laz_file, down_sample_point_data
+from datautils import get_data_from_laz_file, down_sample_point_data, get_down_sampled_points_and_classification
 
 import logging
 LOGGER = logging.getLogger(__name__)
@@ -12,7 +12,30 @@ LOGGER = logging.getLogger(__name__)
 
 class Test_3d_Transformer(unittest.TestCase):
 
-    def test_get_points_from_laz_file(self):
+    def test_get_down_sampled_points_and_classification(self):
+        # GIVEN
+        points = np.array([[0.1, 0.0, 0.0],
+                           [0.11, 0.0, 0.0],
+                           [0.2, 0.0, 0.0],
+                           [0.0, 0.0, -2.0],
+                           [0.0, 0.0, -3.0]])
+        classification = np.array([1, 1, 2, 3, 4])
+
+        # WHEN
+        down_sampled_points, down_sampled_classification = \
+            get_down_sampled_points_and_classification(points, classification, 0.5)
+        expected_down_sampled_points = np.array([[0.0, 0.0, -3.0],
+                                                 [0.0, 0.0, -2.0],
+                                                 [(0.1 + 0.11 + 0.2)/3.0, 0.0, 0.0]])
+        expected_down_sampled_classification = np.array([4, 3, 1])
+
+        # THEN
+        print(down_sampled_points)
+        print(down_sampled_classification)
+        assert np.array_equal(down_sampled_points, expected_down_sampled_points)
+        assert np.array_equal(down_sampled_classification, expected_down_sampled_classification)
+
+    def test_get_data_from_laz_file_points_only(self):
         with tempfile.TemporaryDirectory() as tmp_local_dir:
             # GIVEN
             points = np.array([[0.1, 0.0, -0.5],
@@ -26,10 +49,33 @@ class Test_3d_Transformer(unittest.TestCase):
             las.write(las_file)
 
             # WHEN
-            points_from_laz_file = get_points_from_laz_file(las_file)
+            points_from_laz_file = get_data_from_laz_file(las_file, classification=False)
 
             # THEN
             assert np.array_equal(points, points_from_laz_file)
+
+    def test_get_data_from_laz_file_points_and_classification(self):
+        with tempfile.TemporaryDirectory() as tmp_local_dir:
+            # GIVEN
+            points = np.array([[0.1, 0.0, -0.5],
+                               [-0.5, 0.1, 1.0],
+                               [100, 900, 0.4]])
+            classification = np.array([1, 2, 3])
+
+            las_file = os.path.join(tmp_local_dir, "test.laz")
+            las = laspy.create(file_version="1.4", point_format=6)
+            las.x = points[:, 0]
+            las.y = points[:, 1]
+            las.z = points[:, 2]
+            las.classification = classification
+            las.write(las_file)
+
+            # WHEN
+            points_out, classification_out = get_data_from_laz_file(las_file, classification=True)
+
+            # THEN
+            assert np.array_equal(points_out, points)
+            assert np.array_equal(classification_out, classification)
 
     def test_down_sample_point_data(self):
 
