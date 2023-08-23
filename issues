@@ -1,2 +1,4 @@
 laz reading precision
 normalisation of coordinates
+randomise creation of training bubbles(tokens)
+batch dimension in data loader

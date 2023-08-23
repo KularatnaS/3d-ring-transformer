@@ -80,6 +80,66 @@ def get_down_sampled_points_and_classification(points, classification, voxel_siz
     return down_sampled_points, down_sampled_classification
 
 
+def bounding_box_calculator(point_cloud):
+    """Function to calculate the bounding box of a point cloud
+
+    Parameters
+    ----------
+    point_cloud : numpy array
+        nPoints x 3 array containing [x,y,z] information
+
+    Returns
+    -------
+    type: array of 6 floats
+    Values corresponding to the dimensions of the bounding box in the order: [min_x, max_x, min_y, max_y, min_z, max_z]
+
+    """
+
+    # Calculating the bounding box of the point cloud
+    max_bounds = np.amax(point_cloud, axis=0)[0:3]
+    min_bounds = np.amin(point_cloud, axis=0)[0:3]
+
+    max_x = max_bounds[0]
+    min_x = min_bounds[0]
+    max_y = max_bounds[1]
+    min_y = min_bounds[1]
+    max_z = max_bounds[2]
+    min_z = min_bounds[2]
+
+    return np.array([min_x, max_x, min_y, max_y, min_z, max_z])
+
+
+def calc_train_bubble_centres(bounding_box_dimensions, bubble_slide_step):
+    """Function to determine a list of train bubble centres
+
+    Parameters
+    ----------
+    bounding_box_dimensions : numpy array
+        An array of 6 floats corresponding to bounding box dimensions of a point cloud:
+        [min_x, max_x, min_y, max_y, min_z, max_z]
+    bubble_slide_step : float
+        Resolution at which inference centres will be sampled.
+
+    Returns
+    -------
+    An array of train bubble centres -> np.array([[c1], [c2], [c3]])
+
+    """
+
+    # splitting the x,y and z ranges of the bounding box based on bubble_slide_step
+    create_range = lambda min_v, max_v, step: np.arange(min_v, max_v + step, step)
+    x = create_range(bounding_box_dimensions[0], bounding_box_dimensions[1], bubble_slide_step)
+    y = create_range(bounding_box_dimensions[2], bounding_box_dimensions[3], bubble_slide_step)
+    z = create_range(bounding_box_dimensions[4], bounding_box_dimensions[5], bubble_slide_step)
+
+    # creating a 3d grid of the bounding box
+    x_grid, y_grid, z_grid = np.meshgrid(x, y, z)
+
+    # converting the 3d grid into a list of points
+    train_bubble_centres = np.vstack([x_grid.ravel(), y_grid.ravel(), z_grid.ravel()]).transpose()
+
+    return np.asarray(train_bubble_centres)
+
 # points, classification = get_data_from_laz_file("train-data/pc_46_0_out.laz")
 # down_sampled_points, down_sampled_classification = get_down_sampled_points_and_classification(points, classification,
 #                                                                                               0.08)
