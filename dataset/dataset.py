@@ -8,14 +8,27 @@ import numpy as np
 from sklearn.neighbors import NearestNeighbors
 
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 
-from datautils import get_data_from_laz_file, get_down_sampled_points_and_classification, bounding_box_calculator, \
-    calc_train_bubble_centres
+from dataset.datautils import get_data_from_laz_file, get_down_sampled_points_and_classification, \
+    bounding_box_calculator, calc_train_bubble_centres
 
 
 import logging
 LOGGER = logging.getLogger(__name__)
+
+
+def collate_fn(batch):
+    """
+    batch is a list of tuples
+    each tuple is of the form (point_tokens, label_tokens)
+    Example batch -> [(), (), (), ...]
+    """
+
+    data = [item[0] for item in batch]
+    target = [item[1] for item in batch]
+
+    return data, target
 
 
 class TokenizedBubbleDataset(Dataset):
@@ -69,58 +82,41 @@ class TrainingBubblesCreator:
 
             total_n_points = down_sampled_points.shape[0]
             if self.max_points_per_bubble > total_n_points:
-                LOGGER.info(f"Total number of points in the laz file is less than max points per bubble. Skipping")
+                n_neighbours = total_n_points
             else:
-                LOGGER.info(f"Calculating nearest neighbours")
-                neighbours = NearestNeighbors(n_neighbors=self.max_points_per_bubble,
-                                              algorithm='auto').fit(down_sampled_points)
-                bounding_box = bounding_box_calculator(down_sampled_points)
-                train_bubble_centres = calc_train_bubble_centres(bounding_box, grid_resolution)
+                n_neighbours = self.max_points_per_bubble
 
-                counter = 0
-                LOGGER.info(f"Tokenizing bubbles")
-                for bubble_centre in train_bubble_centres:
-                    LOGGER.info(f"Remaining bubbles: {len(train_bubble_centres) - counter}")
-                    _, indices = neighbours.kneighbors(bubble_centre.reshape(1, -1))
-                    point_tokens, label_tokens = self._split_bubble_to_rings(down_sampled_points[indices.flatten()],
-                                                                             down_sampled_classification[indices.flatten()],
-                                                                             bubble_centre)
-                    # get name of laz file
-                    laz_file_name = Path(laz_file).stem
-                    save_name = os.path.join(output_data_dir, f"{laz_file_name}_{counter}.npz")
-                    np.savez(save_name, point_tokens=point_tokens, label_tokens=label_tokens)
-                    #torch.save((point_tokens, label_tokens), save_name)
-                    counter += 1
+            LOGGER.info(f"Calculating nearest neighbours")
+            neighbours = NearestNeighbors(n_neighbors=n_neighbours,
+                                          algorithm='auto').fit(down_sampled_points)
+            bounding_box = bounding_box_calculator(down_sampled_points)
+            train_bubble_centres = calc_train_bubble_centres(bounding_box, grid_resolution)
+
+            counter = 0
+            LOGGER.info(f"Tokenizing bubbles")
+            for bubble_centre in train_bubble_centres:
+                LOGGER.info(f"Remaining bubbles: {len(train_bubble_centres) - counter}")
+                _, indices = neighbours.kneighbors(bubble_centre.reshape(1, -1))
+                point_tokens, label_tokens = self._split_bubble_to_rings(down_sampled_points[indices.flatten()],
+                                                                         down_sampled_classification[indices.flatten()],
+                                                                         bubble_centre)
+                # get name of laz file
+                laz_file_name = Path(laz_file).stem
+                save_name = os.path.join(output_data_dir, f"{laz_file_name}_{counter}.pt")
+                torch.save((point_tokens, label_tokens), save_name)
+                counter += 1
 
     def _split_bubble_to_rings(self, points, classification, bubble_centre):
         point_tokens = []
         label_tokens = []
 
-        for i in range(math.floor(len(points)/self.max_points_per_ring)):
+        for i in range(math.ceil(len(points)/self.max_points_per_ring)):
             start_index = i * self.max_points_per_ring
             end_index = (i + 1) * self.max_points_per_ring
             if end_index > len(points):
-                raise ValueError("End index is greater than the number of points in the bubble")
+                end_index = len(points)
 
             point_tokens.append(points[start_index:end_index] - bubble_centre)
             label_tokens.append(classification[start_index:end_index])
 
-        return np.asarray(point_tokens), np.asarray(label_tokens)
-
-
-logging.basicConfig(level=logging.INFO)
-import config
-cf = config.get_config()
-BT = TrainingBubblesCreator(cf["max_points_per_bubble"], cf["max_points_per_ring"], 0.08)
-BT.run("train-data-mini", "train-bubbles", 15.0)
-
-# dataset = TokenizedBubbleDataset('train-bubbles/', n_classes_model=4)
-# dataloader = DataLoader(dataset=dataset, batch_size=1, shuffle=True, num_workers=2)
-#
-# # get next batch
-# iterator = iter(dataloader)
-# point_tokens, label_tokens = next(iterator)
-# print(point_tokens[0])
-# print(point_tokens[0].shape)
-
-from einops import rearrange
+        return point_tokens, label_tokens

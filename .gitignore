@@ -1,4 +1,6 @@
-train-data/
+data/
+.pytest_cache/
+ringtransformer.egg-info/
 __pycache__/
 train-bubbles/
 train-data-mini/
