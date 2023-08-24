@@ -139,8 +139,3 @@ def calc_train_bubble_centres(bounding_box_dimensions, bubble_slide_step):
     train_bubble_centres = np.vstack([x_grid.ravel(), y_grid.ravel(), z_grid.ravel()]).transpose()
 
     return np.asarray(train_bubble_centres)
-
-# points, classification = get_data_from_laz_file("train-data/pc_46_0_out.laz")
-# down_sampled_points, down_sampled_classification = get_down_sampled_points_and_classification(points, classification,
-#                                                                                               0.08)
-# save_as_laz_file(down_sampled_points, "test.laz", down_sampled_classification)
