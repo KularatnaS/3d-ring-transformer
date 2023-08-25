@@ -2,7 +2,20 @@ import numpy as np
 from scipy.sparse import csr_matrix
 import laspy
 from sklearn.neighbors import NearestNeighbors
+import torch
 
+from einops import rearrange
+
+
+def bubble_to_laz_file(bubble_path, output_file_name):
+
+    data = torch.load(bubble_path)
+    point_tokens = data[0]
+    points = rearrange(point_tokens, 'rings points xyz ->  (rings points) xyz')
+
+    labels = data[1]
+    labels = rearrange(labels, 'rings labels -> (rings labels)')
+    save_as_laz_file(points, output_file_name, labels)
 
 def save_as_laz_file(points, filename, classification=None):
     las = laspy.create(file_version="1.4", point_format=6)

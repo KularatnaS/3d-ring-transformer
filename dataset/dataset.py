@@ -48,22 +48,26 @@ class TokenizedBubbleDataset(Dataset):
         # one hot encode labels
         for label_token in label_tokens:
             one_hot_encoded_matrix = np.zeros((len(label_token), self.n_classes_model))
-            one_hot_encoded_matrix[range(len(label_token)), label_token] = 1
+            one_hot_encoded_matrix[range(len(label_token)), label_token.astype(int)] = 1
             label_tokens_one_hot_encoded.append(one_hot_encoded_matrix.astype(np.float32))
 
-        return point_tokens, torch.from_numpy(np.asarray(label_tokens_one_hot_encoded))
+        n_missing_rings = torch.tensor([data[2]], dtype=torch.int32)
+
+        return point_tokens, torch.from_numpy(np.asarray(label_tokens_one_hot_encoded)), n_missing_rings
 
     def __len__(self):
         return len(self.tokenized_bubbles)
 
 
 class TrainingBubblesCreator:
-    def __init__(self, max_points_per_bubble, points_per_ring, model_resolution):
+    def __init__(self, max_points_per_bubble, points_per_ring, rings_per_bubble, n_point_features, model_resolution):
         self.max_points_per_bubble = max_points_per_bubble
         self.points_per_ring = points_per_ring
+        self.rings_per_bubble = rings_per_bubble
+        self.n_point_features = n_point_features
         self.model_resolution = model_resolution
 
-    def run(self, input_data_dir, output_data_dir, grid_resolution, min_point_per_laz_file_factor=3):
+    def run(self, input_data_dir, output_data_dir, grid_resolution, min_rings_per_laz=3):
         # check if output directory exists, and if so, delete it and recreate it
         if os.path.exists(output_data_dir):
             shutil.rmtree(output_data_dir)
@@ -80,7 +84,7 @@ class TrainingBubblesCreator:
             del points, classification
 
             total_n_points = down_sampled_points.shape[0]
-            if total_n_points > min_point_per_laz_file_factor * self.points_per_ring:
+            if total_n_points > min_rings_per_laz * self.points_per_ring:
                 if self.max_points_per_bubble > total_n_points:
                     n_neighbours = total_n_points
                 else:
@@ -97,28 +101,31 @@ class TrainingBubblesCreator:
                 for bubble_centre in train_bubble_centres:
                     LOGGER.info(f"Remaining bubbles: {len(train_bubble_centres) - counter}")
                     _, indices = neighbours.kneighbors(bubble_centre.reshape(1, -1))
-                    point_tokens, label_tokens = self._split_bubble_to_rings(down_sampled_points[indices.flatten()],
-                                                                             down_sampled_classification[indices.flatten()],
-                                                                             bubble_centre)
+                    point_tokens, label_tokens, n_missing_rings = \
+                        self._split_bubble_to_rings(down_sampled_points[indices.flatten()],
+                                                    down_sampled_classification[indices.flatten()], bubble_centre)
                     # get name of laz file
                     laz_file_name = Path(laz_file).stem
                     save_name = os.path.join(output_data_dir, f"{laz_file_name}_{counter}.pt")
-                    torch.save((point_tokens, label_tokens), save_name)
+                    torch.save((point_tokens, label_tokens, n_missing_rings), save_name)
                     counter += 1
             else:
                 LOGGER.info(f"Skipping {laz_file} because it has too few points")
 
     def _split_bubble_to_rings(self, points, classification, bubble_centre):
-        point_tokens = []
-        label_tokens = []
+        point_tokens = np.zeros((self.rings_per_bubble, self.points_per_ring, self.n_point_features))
+        label_tokens = np.zeros((self.rings_per_bubble, self.points_per_ring))
 
-        for i in range(math.floor(len(points)/self.points_per_ring)):
+        n_valid_rings = math.floor(len(points)/self.points_per_ring)
+        n_missing_rings = self.rings_per_bubble - n_valid_rings
+
+        for i in range(n_valid_rings):
             start_index = i * self.points_per_ring
             end_index = (i + 1) * self.points_per_ring
             if end_index > len(points):
                 raise ValueError("end_index is greater than the number of points in the bubble")
 
-            point_tokens.append(points[start_index:end_index] - bubble_centre)
-            label_tokens.append(classification[start_index:end_index])
+            point_tokens[i] = points[start_index:end_index] - bubble_centre
+            label_tokens[i] = classification[start_index:end_index]
 
-        return np.asarray(point_tokens), np.asarray(label_tokens)
+        return point_tokens, label_tokens, n_missing_rings
