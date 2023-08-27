@@ -21,22 +21,47 @@ class Test_3d_transformer_dataset(unittest.TestCase):
 
     def test_collate_fn(self):
         # GIVEN
-        batch = [(1, "a"), (2, "b"), (3, "c")]
+        bubble_0 = torch.tensor \
+                ([
+                    [[0., 0., 0.], [0., 0., -0.1], [0., 0., -0.2], [0., 0., -0.3], [0, 0., -0.4]],  # ring 0
+                    [[0., 0., -0.5], [0., 0., -0.6], [0., 0., -0.7], [0., 0., -0.8], [0., 0., -0.9]]  # ring 1
+                ])
+        bubble_1 = torch.tensor \
+                ([
+                    [[0., 0., 0.], [0.1, 0., -0.1], [0., 0., -0.2], [0., 0., -0.3], [0, 0., -0.4]],  # ring 0
+                    [[0., 0., -0.5], [0.1, 0., -0.6], [0., 0., -0.7], [0.2, 0., -0.8], [0., 0., -0.9]]  # ring 1
+                ])
+        label_token_0 = \
+            torch.tensor([  # bubble 0
+                [[0., 0., 1., 0.], [1., 0., 0., 0.], [0., 0., 0., 1.], [0., 1., 0., 0.], [1., 0., 0., 0.]],  # ring 0
+                [[0., 1., 0., 0.], [1., 0., 0., 0.], [0., 0., 0., 1.], [0., 1., 0., 0.], [0., 0., 1., 0.]]  # ring 1
+            ])
+        label_token_1 = \
+            torch.tensor([  # bubble 0
+                [[0., 0., 1., 0.], [1., 0., 0., 0.], [0., 0., 0., 1.], [0., 1., 0., 0.], [0., 1., 0., 0.]],  # ring 0
+                [[0., 1., 0., 0.], [1., 0., 0., 0.], [0., 0., 0., 1.], [0., 0., 1., 0.], [0., 0., 1., 0.]]  # ring 1
+            ])
+        n_missing_rings_0 = torch.tensor([0])
+        n_missing_rings_1 = torch.tensor([1])
+        batch = [(bubble_0, label_token_0, n_missing_rings_0), (bubble_1, label_token_1, n_missing_rings_1)]
 
         # WHEN
-        data, target = collate_fn(batch)
+        point_tokens, label_tokens, n_missing_rings = collate_fn(batch)
 
         # THEN
-        assert data == [1, 2, 3]
-        assert target == ["a", "b", "c"]
+        assert torch.equal(point_tokens, torch.stack([bubble_0, bubble_1]))
+        assert torch.equal(label_tokens, torch.stack([label_token_0, label_token_1]))
+        assert torch.equal(n_missing_rings, torch.stack([n_missing_rings_0, n_missing_rings_1]))
 
-    def test_dataloader_all_rings_have_equal_n_points(self):
+    def test_dataloader_batch_size_2(self):
         # GIVEN
         max_points_per_bubble = 10
         points_per_ring = 5
-        rings_per_bubble = 2
+        rings_per_bubble = 4
         n_point_features = 3
         model_resolution = 0.01
+        n_classes_model = 4
+
         points = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.1], [0.0, 0.0, 0.2], [0.0, 0.0, 0.3], [0.0, 0.0, 0.4],
                            [0.0, 0.0, 0.5], [0.0, 0.0, 0.6], [0.0, 0.0, 0.7], [0.0, 0.0, 0.8], [0.0, 0.0, 0.9],
                            [0.0, 0.0, 1.0]])
@@ -54,16 +79,95 @@ class Test_3d_transformer_dataset(unittest.TestCase):
             training_bubbles_creator.run(tmp_local_dir, os.path.join(tmp_local_dir, 'bubbles'), 1.0,
                                          min_rings_per_laz=1)
 
-            dataset = TokenizedBubbleDataset(os.path.join(tmp_local_dir, 'bubbles'), 4)
-            dataloader = DataLoader(dataset=dataset, batch_size=1, shuffle=False, num_workers=2)
+            dataset = TokenizedBubbleDataset(os.path.join(tmp_local_dir, 'bubbles'), n_classes_model, rings_per_bubble)
+
+            # test for batch size 2
+            dataloader = DataLoader(dataset=dataset, batch_size=2, shuffle=False, num_workers=2, collate_fn=collate_fn)
+            iterator = iter(dataloader)
+            point_tokens, label_tokens, encoder_mask = next(iterator)
+            assert point_tokens.shape[0] == 2
+            assert label_tokens.shape[0] == 2
+            assert encoder_mask.shape[0] == 2
+
+            expected_point_tokens = \
+                torch.tensor \
+                        ([  # batch
+                            [  # bubble 0
+                                [[0., 0., 0.], [0., 0., -0.1], [0., 0., -0.2], [0., 0., -0.3], [0, 0., -0.4]],  # ring 0
+                                [[0., 0., -0.5], [0., 0., -0.6], [0., 0., -0.7], [0., 0., -0.8], [0., 0., -0.9]],  # ring 1
+                                [[0., 0., 0.], [0., 0., 0.], [0., 0., 0.], [0, 0., 0.], [0, 0., 0.]],  # ring 2 padding
+                                [[0., 0., 0.], [0., 0., 0.], [0., 0., 0.], [0, 0., 0.], [0, 0., 0.]]  # ring 3 padding
+                            ],
+                            [  # bubble 1
+                                [[0., 0., 0.], [0., 0., 0.1], [0., 0., 0.2], [0., 0., 0.3], [0, 0., 0.4]],  # ring 0
+                                [[0., 0., 0.5], [0., 0., 0.6], [0., 0., 0.7], [0., 0., 0.8], [0., 0., 0.9]],  # ring 1
+                                [[0., 0., 0.], [0., 0., 0.], [0., 0., 0.], [0, 0., 0.], [0, 0., 0.]],  # ring 2 padding
+                                [[0., 0., 0.], [0., 0., 0.], [0., 0., 0.], [0, 0., 0.], [0, 0., 0.]]  # ring 3 padding
+                            ]
+                        ])
+            # use torch to check if two tensors are almost equal
+            assert torch.equal(point_tokens, expected_point_tokens)
+            assert point_tokens.dtype == torch.float32
+
+            # [np.array([2, 0, 3, 1, 0]), np.array([1, 0, 3, 1, 2])] -> one hot encoded
+            expected_label_tokens = \
+                torch.tensor([  # batch
+                    [  # bubble 0
+                        [[0., 0., 1., 0.], [1., 0., 0., 0.], [0., 0., 0., 1.], [0., 1., 0., 0.], [1., 0., 0., 0.]], # ring 0
+                        [[0., 1., 0., 0.], [1., 0., 0., 0.], [0., 0., 0., 1.], [0., 1., 0., 0.], [0., 0., 1., 0.]], # ring 1
+                        [[0., 0., 0., 0.], [0., 0., 0., 0.], [0., 0., 0., 0.], [0, 0., 0., 0.], [0, 0., 0., 0.]], # ring 2 padding
+                        [[0., 0., 0., 0.], [0., 0., 0., 0.], [0., 0., 0., 0.], [0, 0., 0., 0.], [0, 0., 0., 0.]]  # ring 3 padding
+                    ],
+                    [  # bubble 1  classification = np.array([0, 2, 1, 3, 0, 1, 0, 1, 3, 0, 2])
+                        [[1., 0., 0., 0.], [0., 0., 1., 0.], [0., 1., 0., 0.], [0., 0., 0., 1.], [1., 0., 0., 0.]], # ring 0
+                        [[0., 1., 0., 0.], [1., 0., 0., 0.], [0., 1., 0., 0.], [0., 0., 0., 1.], [1., 0., 0., 0.]], # ring 1
+                        [[0., 0., 0., 0.], [0., 0., 0., 0.], [0., 0., 0., 0.], [0, 0., 0., 0.], [0, 0., 0., 0.]], # ring 2 padding
+                        [[0., 0., 0., 0.], [0., 0., 0., 0.], [0., 0., 0., 0.], [0, 0., 0., 0.], [0, 0., 0., 0.]]  # ring 3 padding
+                    ]
+                ])
+            assert torch.equal(label_tokens, expected_label_tokens)
+            assert label_tokens.dtype == torch.float32
+
+            expected_encoder_mask = torch.tensor([[1, 1, 0, 0],
+                                                  [1, 1, 0, 0]])
+            assert torch.equal(encoder_mask, expected_encoder_mask)
+            assert encoder_mask.dtype == torch.int32
+
+    def test_dataloader_batch_size_1(self):
+        # GIVEN
+        max_points_per_bubble = 10
+        points_per_ring = 5
+        rings_per_bubble = 2
+        n_point_features = 3
+        model_resolution = 0.01
+        n_classes_model = 4
+
+        points = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.1], [0.0, 0.0, 0.2], [0.0, 0.0, 0.3], [0.0, 0.0, 0.4],
+                           [0.0, 0.0, 0.5], [0.0, 0.0, 0.6], [0.0, 0.0, 0.7], [0.0, 0.0, 0.8], [0.0, 0.0, 0.9],
+                           [0.0, 0.0, 1.0]])
+        classification = np.array([0, 2, 1, 3, 0, 1, 0, 1, 3, 0, 2])
+
+        # WHEN / THEN
+        with tempfile.TemporaryDirectory() as tmp_local_dir:
+            save_as_laz_file(points, os.path.join(tmp_local_dir, "test.laz"), classification)
+            training_bubbles_creator = \
+                TrainingBubblesCreator(max_points_per_bubble=max_points_per_bubble,
+                                       points_per_ring=points_per_ring,
+                                       rings_per_bubble=rings_per_bubble,
+                                       n_point_features=n_point_features,
+                                       model_resolution=model_resolution)
+            training_bubbles_creator.run(tmp_local_dir, os.path.join(tmp_local_dir, 'bubbles'), 1.0,
+                                         min_rings_per_laz=1)
+
+            dataset = TokenizedBubbleDataset(os.path.join(tmp_local_dir, 'bubbles'), n_classes_model, rings_per_bubble)
+            dataloader = DataLoader(dataset=dataset, batch_size=1, shuffle=False, num_workers=2, collate_fn=collate_fn)
 
             # get next batch
             iterator = iter(dataloader)
-            point_tokens, label_tokens, n_missing_rings = next(iterator)
-            print(point_tokens.shape)
+            point_tokens, label_tokens, encoder_mask = next(iterator)
             assert len(point_tokens) == 1
             assert len(label_tokens) == 1
-            assert len(n_missing_rings) == 1
+            assert len(encoder_mask) == 1
 
             expected_point_tokens = \
                 torch.tensor\
@@ -89,25 +193,19 @@ class Test_3d_transformer_dataset(unittest.TestCase):
             assert torch.equal(label_tokens, expected_label_tokens)
             assert label_tokens.dtype == torch.float32
 
-            expected_mask = torch.tensor([[0]])
-            assert torch.equal(n_missing_rings, expected_mask)
-            assert n_missing_rings.dtype == torch.int32
+            expected_encoder_mask = torch.tensor([[1, 1]])
+            assert torch.equal(encoder_mask, expected_encoder_mask)
+            assert encoder_mask.dtype == torch.int32
 
-            # test for batch size 2
-            dataloader = DataLoader(dataset=dataset, batch_size=2, shuffle=False, num_workers=2, collate_fn=collate_fn)
-            iterator = iter(dataloader)
-            point_tokens, label_tokens = next(iterator)
-            assert len(point_tokens) == 2
-            assert len(label_tokens) == 2
-            #print(point_tokens)
-
-    def test_dataset_get_item(self):
+    def test_dataset_get_item_with_ring_padding(self):
         # GIVEN
         max_points_per_bubble = 10
         points_per_ring = 5
-        rings_per_bubble = 2
+        rings_per_bubble = 4
         n_point_features = 3
         model_resolution = 0.01
+        n_classes_model = 4
+
         points = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.1], [0.0, 0.0, 0.2], [0.0, 0.0, 0.3], [0.0, 0.0, 0.4],
                            [0.0, 0.0, 0.5], [0.0, 0.0, 0.6], [0.0, 0.0, 0.7], [0.0, 0.0, 0.8], [0.0, 0.0, 0.9],
                            [0.0, 0.0, 1.0]])
@@ -125,8 +223,64 @@ class Test_3d_transformer_dataset(unittest.TestCase):
             training_bubbles_creator.run(tmp_local_dir, os.path.join(tmp_local_dir, 'bubbles'), 1.0,
                                          min_rings_per_laz=1)
 
-            dataset = TokenizedBubbleDataset(os.path.join(tmp_local_dir, 'bubbles'), 4)
-            point_tokens, label_tokens, n_missing_rings = dataset.__getitem__(0)
+            dataset = TokenizedBubbleDataset(os.path.join(tmp_local_dir, 'bubbles'), n_classes_model, rings_per_bubble)
+            point_tokens, label_tokens, encoder_mask = dataset.__getitem__(0)
+            expected_point_tokens = \
+                torch.tensor \
+                        ([  # bubble 0
+                            [[0., 0., 0.], [0., 0., -0.1], [0., 0., -0.2], [0., 0., -0.3], [0, 0., -0.4]],  # ring 0
+                            [[0., 0., -0.5], [0., 0., -0.6], [0., 0., -0.7], [0., 0., -0.8], [0., 0., -0.9]],  # ring 1
+                            [[0., 0., 0.], [0., 0., 0.], [0., 0., 0.], [0, 0., 0.], [0, 0., 0.]],  # ring 2 padding
+                            [[0., 0., 0.], [0., 0., 0.], [0., 0., 0.], [0, 0., 0.], [0, 0., 0.]]  # ring 3 padding
+                        ])
+            # use torch to check if two tensors are almost equal
+            assert torch.equal(point_tokens, expected_point_tokens)
+            assert point_tokens.dtype == torch.float32
+
+            print(label_tokens)
+            # [np.array([2, 0, 3, 1, 0]), np.array([1, 0, 3, 1, 2])] -> one hot encoded
+            expected_label_tokens = \
+                torch.tensor([  # bubble 0
+                                [[0., 0., 1., 0.], [1., 0., 0., 0.], [0., 0., 0., 1.], [0., 1., 0., 0.], [1., 0., 0., 0.]], # ring 0
+                                [[0., 1., 0., 0.], [1., 0., 0., 0.], [0., 0., 0., 1.], [0., 1., 0., 0.], [0., 0., 1., 0.]],  # ring 1
+                                [[0., 0., 0., 0.], [0., 0., 0., 0.], [0., 0., 0., 0.], [0., 0., 0., 0.], [0., 0., 0., 0.]],  # ring 2 padding
+                                [[0., 0., 0., 0.], [0., 0., 0., 0.], [0., 0., 0., 0.], [0., 0., 0., 0.], [0., 0., 0., 0.]]  # ring 3 padding
+                            ])
+            assert torch.equal(label_tokens, expected_label_tokens)
+            assert label_tokens.dtype == torch.float32
+
+            expected_encoder_mask = torch.tensor([1, 1, 0, 0])
+            assert torch.equal(encoder_mask, expected_encoder_mask)
+            assert encoder_mask.dtype == torch.int32
+
+    def test_dataset_get_item_no_ring_padding(self):
+        # GIVEN
+        max_points_per_bubble = 10
+        points_per_ring = 5
+        rings_per_bubble = 2
+        n_point_features = 3
+        model_resolution = 0.01
+        n_classes_model = 4
+
+        points = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.1], [0.0, 0.0, 0.2], [0.0, 0.0, 0.3], [0.0, 0.0, 0.4],
+                           [0.0, 0.0, 0.5], [0.0, 0.0, 0.6], [0.0, 0.0, 0.7], [0.0, 0.0, 0.8], [0.0, 0.0, 0.9],
+                           [0.0, 0.0, 1.0]])
+        classification = np.array([0, 2, 1, 3, 0, 1, 0, 1, 3, 0, 2])
+
+        # WHEN / THEN
+        with tempfile.TemporaryDirectory() as tmp_local_dir:
+            save_as_laz_file(points, os.path.join(tmp_local_dir, "test.laz"), classification)
+            training_bubbles_creator = \
+                TrainingBubblesCreator(max_points_per_bubble=max_points_per_bubble,
+                                       points_per_ring=points_per_ring,
+                                       rings_per_bubble=rings_per_bubble,
+                                       n_point_features=n_point_features,
+                                       model_resolution=model_resolution)
+            training_bubbles_creator.run(tmp_local_dir, os.path.join(tmp_local_dir, 'bubbles'), 1.0,
+                                         min_rings_per_laz=1)
+
+            dataset = TokenizedBubbleDataset(os.path.join(tmp_local_dir, 'bubbles'), n_classes_model, rings_per_bubble)
+            point_tokens, label_tokens, encoder_mask = dataset.__getitem__(0)
             expected_point_tokens = \
                 torch.tensor \
                         ([  # bubble 0
@@ -146,9 +300,9 @@ class Test_3d_transformer_dataset(unittest.TestCase):
             assert torch.equal(label_tokens, expected_label_tokens)
             assert label_tokens.dtype == torch.float32
 
-            expected_n_missing_rings = torch.tensor([0])
-            assert torch.equal(n_missing_rings, expected_n_missing_rings)
-            assert n_missing_rings.dtype == torch.int32
+            expected_encoder_mask = torch.tensor([1, 1])
+            assert torch.equal(encoder_mask, expected_encoder_mask)
+            assert encoder_mask.dtype == torch.int32
 
             # print total number of bubbles at output directory
             all_bubbles = glob.glob(os.path.join(tmp_local_dir, 'bubbles', "*.pt"))
@@ -273,7 +427,6 @@ class Test_3d_transformer_dataset(unittest.TestCase):
             all_bubbles = glob.glob(os.path.join(tmp_local_dir, 'bubbles', "*.pt"))
             test_bubble = torch.load(all_bubbles[1])
             point_tokens = test_bubble[0]
-            print(point_tokens)
             expected_point_tokens = np.array([
                 [[0., 0., 0.], [0., 0., 0.1], [0., 0., 0.2], [0., 0., 0.3], [0, 0., 0.4]],
                 [[0., 0., 0.5], [0., 0., 0.6], [0., 0., 0.7], [0., 0., 0.8], [0., 0., 0.9]]

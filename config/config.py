@@ -13,4 +13,5 @@ def get_config():
             "n_point_features": 3,  # x, y, z
             "max_points_per_bubble": max_points_per_bubble,
             "points_per_ring": points_per_ring,
+            "rings_per_bubble": rings_per_bubble,
         }

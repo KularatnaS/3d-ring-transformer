@@ -21,39 +21,48 @@ LOGGER = logging.getLogger(__name__)
 def collate_fn(batch):
     """
     batch is a list of tuples
-    each tuple is of the form (point_tokens, label_tokens)
+    each tuple is of the form (point_tokens, label_tokens, n_missing_rings)
     Example batch -> [(), (), (), ...]
     """
 
     data = [item[0] for item in batch]
     target = [item[1] for item in batch]
+    n_missing_rings = [item[2] for item in batch]
 
-    return data, target
+    return torch.stack(data), torch.stack(target), torch.stack(n_missing_rings)
 
 
 class TokenizedBubbleDataset(Dataset):
-    def __init__(self, data_dir, n_classes_model):
+    def __init__(self, data_dir, n_classes_model, rings_per_bubble):
         self.data_dir = data_dir
         self.tokenized_bubbles = glob.glob(os.path.join(data_dir, "*.pt"))
         self.n_classes_model = n_classes_model
+        self.rings_per_bubble = rings_per_bubble
 
     def __getitem__(self, index):
         # load data
         data = torch.load(self.tokenized_bubbles[index])
 
         point_tokens = torch.from_numpy(data[0].astype(np.float32))
+        assert point_tokens.shape[0] == self.rings_per_bubble
+
+        n_missing_rings = torch.tensor([data[2]], dtype=torch.int32)
+        encoder_mask = torch.ones(self.rings_per_bubble, dtype=torch.int32)
+
+        if n_missing_rings > 0:
+            encoder_mask[-n_missing_rings:] = 0
 
         label_tokens = data[1]
         label_tokens_one_hot_encoded = []
+
         # one hot encode labels
-        for label_token in label_tokens:
+        for counter, label_token in enumerate(label_tokens):
             one_hot_encoded_matrix = np.zeros((len(label_token), self.n_classes_model))
-            one_hot_encoded_matrix[range(len(label_token)), label_token.astype(int)] = 1
+            if counter < self.rings_per_bubble - n_missing_rings:
+                one_hot_encoded_matrix[range(len(label_token)), label_token.astype(int)] = 1
             label_tokens_one_hot_encoded.append(one_hot_encoded_matrix.astype(np.float32))
 
-        n_missing_rings = torch.tensor([data[2]], dtype=torch.int32)
-
-        return point_tokens, torch.from_numpy(np.asarray(label_tokens_one_hot_encoded)), n_missing_rings
+        return point_tokens, torch.from_numpy(np.asarray(label_tokens_one_hot_encoded)), encoder_mask
 
     def __len__(self):
         return len(self.tokenized_bubbles)
