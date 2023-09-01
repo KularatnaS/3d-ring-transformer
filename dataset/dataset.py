@@ -51,6 +51,7 @@ class TokenizedBubbleDataset(Dataset):
 
         if n_missing_rings > 0:
             encoder_mask[-n_missing_rings:] = 0
+        encoder_mask = encoder_mask.unsqueeze(0).unsqueeze(0)  # [1, 1, rings_per_bubble]
 
         label_tokens = data[1]
         label_tokens_one_hot_encoded = []

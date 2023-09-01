@@ -41,8 +41,8 @@ class Test_3d_transformer_dataset(unittest.TestCase):
                 [[0., 0., 1., 0.], [1., 0., 0., 0.], [0., 0., 0., 1.], [0., 1., 0., 0.], [0., 1., 0., 0.]],  # ring 0
                 [[0., 1., 0., 0.], [1., 0., 0., 0.], [0., 0., 0., 1.], [0., 0., 1., 0.], [0., 0., 1., 0.]]  # ring 1
             ])
-        n_missing_rings_0 = torch.tensor([0])
-        n_missing_rings_1 = torch.tensor([1])
+        n_missing_rings_0 = torch.tensor([[[0]]])
+        n_missing_rings_1 = torch.tensor([[[1]]])
         batch = [(bubble_0, label_token_0, n_missing_rings_0), (bubble_1, label_token_1, n_missing_rings_1)]
 
         # WHEN
@@ -128,8 +128,10 @@ class Test_3d_transformer_dataset(unittest.TestCase):
             assert torch.equal(label_tokens, expected_label_tokens)
             assert label_tokens.dtype == torch.float32
 
-            expected_encoder_mask = torch.tensor([[1, 1, 0, 0],
-                                                  [1, 1, 0, 0]])
+            expected_encoder_mask = torch.tensor([
+                                                  [[[1, 1, 0, 0]]],
+                                                  [[[1, 1, 0, 0]]]
+                                                 ])
             assert torch.equal(encoder_mask, expected_encoder_mask)
             assert encoder_mask.dtype == torch.int32
 
@@ -193,7 +195,7 @@ class Test_3d_transformer_dataset(unittest.TestCase):
             assert torch.equal(label_tokens, expected_label_tokens)
             assert label_tokens.dtype == torch.float32
 
-            expected_encoder_mask = torch.tensor([[1, 1]])
+            expected_encoder_mask = torch.tensor([[[[1, 1]]]])
             assert torch.equal(encoder_mask, expected_encoder_mask)
             assert encoder_mask.dtype == torch.int32
 
@@ -249,7 +251,7 @@ class Test_3d_transformer_dataset(unittest.TestCase):
             assert torch.equal(label_tokens, expected_label_tokens)
             assert label_tokens.dtype == torch.float32
 
-            expected_encoder_mask = torch.tensor([1, 1, 0, 0])
+            expected_encoder_mask = torch.tensor([[[1, 1, 0, 0]]])
             assert torch.equal(encoder_mask, expected_encoder_mask)
             assert encoder_mask.dtype == torch.int32
 
@@ -300,7 +302,7 @@ class Test_3d_transformer_dataset(unittest.TestCase):
             assert torch.equal(label_tokens, expected_label_tokens)
             assert label_tokens.dtype == torch.float32
 
-            expected_encoder_mask = torch.tensor([1, 1])
+            expected_encoder_mask = torch.tensor([[[1, 1]]])
             assert torch.equal(encoder_mask, expected_encoder_mask)
             assert encoder_mask.dtype == torch.int32
 
