@@ -17,6 +17,7 @@ def bubble_to_laz_file(bubble_path, output_file_name):
     labels = rearrange(labels, 'rings labels -> (rings labels)')
     save_as_laz_file(points, output_file_name, labels)
 
+
 def save_as_laz_file(points, filename, classification=None):
     las = laspy.create(file_version="1.4", point_format=6)
     las.x = points[:, 0]
@@ -28,17 +29,24 @@ def save_as_laz_file(points, filename, classification=None):
     las.write(filename)
 
 
-def get_data_from_laz_file(laz_file, classification=True):
+def get_data_from_laz_file(laz_file, n_classes_model=None, classification=True):
     las = laspy.read(laz_file)
-    x = las.x
-    y = las.y
-    z = las.z
+    x = np.asarray(las.x)
+    y = np.asarray(las.y)
+    z = np.asarray(las.z)
+
+    if n_classes_model is not None:
+        valid_indices = np.isin(las.classification, np.arange(n_classes_model))
+    else:
+        valid_indices = np.arange(len(x))
+
+    return_points = np.stack([x[valid_indices], y[valid_indices], z[valid_indices]], axis=1)
 
     if classification:
-        classification = las.classification
-        return np.stack([x, y, z], axis=1), classification
+        return_classification = np.asarray(las.classification)[valid_indices]
+        return return_points, return_classification
     else:
-        return np.stack([x, y, z], axis=1)
+        return return_points
 
 
 def down_sample_point_data(voxel_size, pc_input):

@@ -70,12 +70,14 @@ class TokenizedBubbleDataset(Dataset):
 
 
 class TrainingBubblesCreator:
-    def __init__(self, max_points_per_bubble, points_per_ring, rings_per_bubble, n_point_features, model_resolution):
+    def __init__(self, max_points_per_bubble, points_per_ring, rings_per_bubble, n_point_features, model_resolution,
+                 n_classes_model):
         self.max_points_per_bubble = max_points_per_bubble
         self.points_per_ring = points_per_ring
         self.rings_per_bubble = rings_per_bubble
         self.n_point_features = n_point_features
         self.model_resolution = model_resolution
+        self.n_classes_model = n_classes_model
 
     def run(self, input_data_dir, output_data_dir, grid_resolution, min_rings_per_laz=3):
         # check if output directory exists, and if so, delete it and recreate it
@@ -87,7 +89,8 @@ class TrainingBubblesCreator:
         for laz_file in laz_files:
             LOGGER.info(f"Processing {laz_file}")
             LOGGER.info(f"Reading points")
-            points, classification = get_data_from_laz_file(laz_file, classification=True)
+            points, classification = get_data_from_laz_file(laz_file, n_classes_model=self.n_classes_model,
+                                                            classification=True)
             LOGGER.info(f"Down sampling points")
             down_sampled_points, down_sampled_classification = \
                 get_down_sampled_points_and_classification(points, classification, self.model_resolution)

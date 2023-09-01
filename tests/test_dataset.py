@@ -75,7 +75,8 @@ class Test_3d_transformer_dataset(unittest.TestCase):
                                        points_per_ring=points_per_ring,
                                        rings_per_bubble=rings_per_bubble,
                                        n_point_features=n_point_features,
-                                       model_resolution=model_resolution)
+                                       model_resolution=model_resolution,
+                                       n_classes_model=n_classes_model)
             training_bubbles_creator.run(tmp_local_dir, os.path.join(tmp_local_dir, 'bubbles'), 1.0,
                                          min_rings_per_laz=1)
 
@@ -157,7 +158,8 @@ class Test_3d_transformer_dataset(unittest.TestCase):
                                        points_per_ring=points_per_ring,
                                        rings_per_bubble=rings_per_bubble,
                                        n_point_features=n_point_features,
-                                       model_resolution=model_resolution)
+                                       model_resolution=model_resolution,
+                                       n_classes_model=n_classes_model)
             training_bubbles_creator.run(tmp_local_dir, os.path.join(tmp_local_dir, 'bubbles'), 1.0,
                                          min_rings_per_laz=1)
 
@@ -221,7 +223,8 @@ class Test_3d_transformer_dataset(unittest.TestCase):
                                        points_per_ring=points_per_ring,
                                        rings_per_bubble=rings_per_bubble,
                                        n_point_features=n_point_features,
-                                       model_resolution=model_resolution)
+                                       model_resolution=model_resolution,
+                                       n_classes_model=n_classes_model)
             training_bubbles_creator.run(tmp_local_dir, os.path.join(tmp_local_dir, 'bubbles'), 1.0,
                                          min_rings_per_laz=1)
 
@@ -277,7 +280,8 @@ class Test_3d_transformer_dataset(unittest.TestCase):
                                        points_per_ring=points_per_ring,
                                        rings_per_bubble=rings_per_bubble,
                                        n_point_features=n_point_features,
-                                       model_resolution=model_resolution)
+                                       model_resolution=model_resolution,
+                                       n_classes_model=n_classes_model)
             training_bubbles_creator.run(tmp_local_dir, os.path.join(tmp_local_dir, 'bubbles'), 1.0,
                                          min_rings_per_laz=1)
 
@@ -317,6 +321,7 @@ class Test_3d_transformer_dataset(unittest.TestCase):
         rings_per_bubble = 2
         n_point_features = 3
         model_resolution = 0.01
+        n_classes_model = 7
         points = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.1], [0.0, 0.0, 0.2], [0.0, 0.0, 0.3], [0.0, 0.0, 0.4],
                            [0.0, 0.0, 0.5], [0.0, 0.0, 0.6]])
         classification = np.array([0, 1, 2, 3, 4, 5, 6])
@@ -330,7 +335,8 @@ class Test_3d_transformer_dataset(unittest.TestCase):
                                        points_per_ring=points_per_ring,
                                        rings_per_bubble=rings_per_bubble,
                                        n_point_features=n_point_features,
-                                       model_resolution=model_resolution)
+                                       model_resolution=model_resolution,
+                                       n_classes_model=n_classes_model)
             with self.assertLogs() as captured:
                 training_bubbles_creator.run(tmp_local_dir, os.path.join(tmp_local_dir, 'bubbles'), 1.0,
                                              min_rings_per_laz=3)
@@ -344,6 +350,7 @@ class Test_3d_transformer_dataset(unittest.TestCase):
         rings_per_bubble = 2
         n_point_features = 3
         model_resolution = 0.01
+        n_classes_model = 7
         points = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.1], [0.0, 0.0, 0.2], [0.0, 0.0, 0.3], [0.0, 0.0, 0.4],
                            [0.0, 0.0, 0.5], [0.0, 0.0, 0.6]])
         classification = np.array([0, 1, 2, 3, 4, 5, 6])
@@ -356,7 +363,8 @@ class Test_3d_transformer_dataset(unittest.TestCase):
                                        points_per_ring=points_per_ring,
                                        rings_per_bubble=rings_per_bubble,
                                        n_point_features=n_point_features,
-                                       model_resolution=model_resolution)
+                                       model_resolution=model_resolution,
+                                       n_classes_model=n_classes_model)
             training_bubbles_creator.run(tmp_local_dir, os.path.join(tmp_local_dir, 'bubbles'), 1.0,
                                          min_rings_per_laz=1)
             # get all files at output directory
@@ -409,6 +417,7 @@ class Test_3d_transformer_dataset(unittest.TestCase):
         rings_per_bubble = 2
         n_point_features = 3
         model_resolution = 0.01
+        n_classes_model = 11
         points = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.1], [0.0, 0.0, 0.2], [0.0, 0.0, 0.3], [0.0, 0.0, 0.4],
                            [0.0, 0.0, 0.5], [0.0, 0.0, 0.6], [0.0, 0.0, 0.7], [0.0, 0.0, 0.8], [0.0, 0.0, 0.9],
                            [0.0, 0.0, 1.0]])
@@ -422,7 +431,8 @@ class Test_3d_transformer_dataset(unittest.TestCase):
                                        points_per_ring=points_per_ring,
                                        rings_per_bubble=rings_per_bubble,
                                        n_point_features=n_point_features,
-                                       model_resolution=model_resolution)
+                                       model_resolution=model_resolution,
+                                       n_classes_model=n_classes_model)
             training_bubbles_creator.run(tmp_local_dir, os.path.join(tmp_local_dir, 'bubbles'), 1.0,
                                          min_rings_per_laz=1)
             # get all files at output directory
@@ -461,6 +471,7 @@ class Test_3d_transformer_dataset(unittest.TestCase):
         points_per_ring = 3
         rings_per_bubble = 2
         n_point_features = 3
+        n_classes_model = 8
 
         model_resolution = 0.08
         train_bubble_centre = np.array([0.1, -0.1, 0.0])
@@ -474,7 +485,8 @@ class Test_3d_transformer_dataset(unittest.TestCase):
                                    points_per_ring=points_per_ring,
                                    rings_per_bubble=rings_per_bubble,
                                    n_point_features=n_point_features,
-                                   model_resolution=model_resolution)
+                                   model_resolution=model_resolution,
+                                   n_classes_model=n_classes_model)
         point_tokens, label_tokens, n_missing_rings = \
             training_bubbles_creator._split_bubble_to_rings(points, classification, train_bubble_centre)
 
@@ -510,6 +522,7 @@ class Test_3d_transformer_dataset(unittest.TestCase):
         points_per_ring = 3
         rings_per_bubble = 3
         n_point_features = 3
+        n_classes_model = 8
 
         model_resolution = 0.08
         train_bubble_centre = np.array([0.1, -0.1, 0.0])
@@ -523,7 +536,8 @@ class Test_3d_transformer_dataset(unittest.TestCase):
                                    points_per_ring=points_per_ring,
                                    rings_per_bubble=rings_per_bubble,
                                    n_point_features=n_point_features,
-                                   model_resolution=model_resolution)
+                                   model_resolution=model_resolution,
+                                   n_classes_model=n_classes_model)
         point_tokens, label_tokens, n_missing_rings = \
             training_bubbles_creator._split_bubble_to_rings(points, classification, train_bubble_centre)
 
@@ -624,7 +638,7 @@ class Test_3d_transformer_dataset(unittest.TestCase):
             las.write(las_file)
 
             # WHEN
-            points_from_laz_file = get_data_from_laz_file(las_file, classification=False)
+            points_from_laz_file = get_data_from_laz_file(las_file, n_classes_model=None, classification=False)
 
             # THEN
             assert np.array_equal(points, points_from_laz_file)
@@ -634,8 +648,10 @@ class Test_3d_transformer_dataset(unittest.TestCase):
             # GIVEN
             points = np.array([[0.1, 0.0, -0.5],
                                [-0.5, 0.1, 1.0],
+                               [100, 900, 0.4],
                                [100, 900, 0.4]])
-            classification = np.array([1, 2, 3])
+
+            classification = np.array([1, 20, 2, 0])
 
             las_file = os.path.join(tmp_local_dir, "test.laz")
             las = laspy.create(file_version="1.4", point_format=6)
@@ -646,11 +662,15 @@ class Test_3d_transformer_dataset(unittest.TestCase):
             las.write(las_file)
 
             # WHEN
-            points_out, classification_out = get_data_from_laz_file(las_file, classification=True)
+            points_out, classification_out = get_data_from_laz_file(las_file, n_classes_model=3, classification=True)
+            expected_points_out = np.array([[0.1, 0.0, -0.5],
+                                            [100, 900, 0.4],
+                                            [100, 900, 0.4]])
+            expected_classification_out = np.array([1, 2, 0])
 
             # THEN
-            assert np.array_equal(points_out, points)
-            assert np.array_equal(classification_out, classification)
+            assert np.array_equal(points_out, expected_points_out)
+            assert np.array_equal(classification_out, expected_classification_out)
 
     def test_down_sample_point_data(self):
 

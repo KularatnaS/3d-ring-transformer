@@ -126,12 +126,12 @@ class Test_3d_transformer_model(unittest.TestCase):
         classification_layer = ClassificationLayer(d_ring_embedding, point_features_div, n_classes_model)
         y = classification_layer(x, per_point_embedded_features)
         assert y.shape == (batch_size, rings_per_bubble, points_per_ring, n_classes_model)
-        # assert that sum along last dimension of y 1
-        sum_along_last_dim = torch.sum(y, dim=-1)
-        # get values
-        sum_along_last_dim = sum_along_last_dim.detach().numpy()
-        # asser all values are 1
-        assert np.allclose(sum_along_last_dim, np.ones_like(sum_along_last_dim))
+        # # assert that sum along last dimension of y 1
+        # sum_along_last_dim = torch.sum(y, dim=-1)
+        # # get values
+        # sum_along_last_dim = sum_along_last_dim.detach().numpy()
+        # # asser all values are 1
+        # assert np.allclose(sum_along_last_dim, np.ones_like(sum_along_last_dim))
 
     def test_encoder(self):
         # GIVEN

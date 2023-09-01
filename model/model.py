@@ -204,7 +204,6 @@ class ClassificationLayer(nn.Module):
         super().__init__()
         assert d_ring_embedding % point_features_div == 0
         self.linear = nn.Linear(int(d_ring_embedding/point_features_div) + d_ring_embedding, n_classes_model)
-        self.softmax = nn.Softmax(dim=-1)
 
     @staticmethod
     def append_ring_embedding_to_per_point_embedded_features(x, per_point_embedded_features):
@@ -216,8 +215,7 @@ class ClassificationLayer(nn.Module):
 
     def forward(self, x, per_point_embedded_features):
         x = ClassificationLayer.append_ring_embedding_to_per_point_embedded_features(x, per_point_embedded_features)
-        x = self.linear(x)
-        return self.softmax(x)  # [batch, n_rings, n_points_per_ring, n_classes_model]
+        return self.linear(x)  # [batch, n_rings, n_points_per_ring, n_classes_model]
 
 
 class RingTransformerClassification(nn.Module):
