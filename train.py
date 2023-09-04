@@ -54,40 +54,47 @@ val_dataset = TokenizedBubbleDataset(data_dir=val_data_dir, n_classes_model=n_cl
                                         rings_per_bubble=rings_per_bubble)
 val_dataloader = DataLoader(dataset=val_dataset, batch_size=1, shuffle=False, num_workers=2,
                             collate_fn=collate_fn)
+
+
 def run_validation(model, device, val_dataloader):
     model.eval()
-    iterator = iter(val_dataloader)
-    batch = next(iterator)
+    for i, batch in enumerate(val_dataloader):
 
-    point_tokens = batch[0].to(device)
-    mask = batch[2].to(device)
+        point_tokens = batch[0].to(device)
+        mask = batch[2].to(device)
 
-    with torch.no_grad():
-        y_predicted = model(point_tokens, mask)  # [batch, n_rings, n_points_per_ring, n_classes_model]
-        y_predicted = rearrange(y_predicted, 'a b c d -> (a b c) d')
-        print(y_predicted.shape)
-        labels = torch.argmax(y_predicted, dim=1)
-        # detach from gpu
-        labels = labels.cpu().numpy()
-        print(np.unique(labels))
-        # save as laz file
-        all_points = rearrange(point_tokens, '1 a b c -> (a b) c').cpu().numpy()
-        save_as_laz_file(points=all_points, classification=labels, filename='data/visualise-val/view.laz')
+        with torch.no_grad():
+            y_predicted = model(point_tokens, mask)  # [batch, n_rings, n_points_per_ring, n_classes_model]
+            y_predicted = rearrange(y_predicted, 'a b c d -> (a b c) d')
+            print(y_predicted.shape)
+            labels = torch.argmax(y_predicted, dim=1)
+            # detach from gpu
+            labels = labels.cpu().numpy()
+            print(np.unique(labels))
+            # save as laz file
+            all_points = rearrange(point_tokens, '1 a b c -> (a b) c').cpu().numpy()
+            file_name = f'data/visualise-val/view_{i}.laz'
+            save_as_laz_file(points=all_points, classification=labels, filename=file_name)
+
 
 # define criterion and optimizer
 criterion = torch.nn.CrossEntropyLoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, eps=1e-9)
+optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
 # training loop
 num_epochs = 10000000
 total_samples = len(dataset)
 n_iterations = math.ceil(total_samples / batch_size)
 
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=10, verbose=True)
 print('batch size:', batch_size)
+print('n_iterations:', n_iterations)
 
 for epoch in range(num_epochs):
+    train_loss_accum = 0.0
     for i, batch in enumerate(dataloader):
 
+        model.train()
         # data batch
         data = batch[0].to(device)
         labels = batch[1].to(device)
@@ -102,6 +109,8 @@ for epoch in range(num_epochs):
         labels = torch.argmax(labels, dim=1)  # one hot encoded to class labels
         loss = criterion(y_predicted, labels)
 
+        train_loss_accum += loss.item()
+
         # backward pass
         loss.backward()
 
@@ -109,7 +118,13 @@ for epoch in range(num_epochs):
         optimizer.step()
         optimizer.zero_grad()
 
-        if (i + 1) % 5 == 0:
-            LOGGER.info(f'epoch {epoch + 1}/{num_epochs}, step {i + 1}/{n_iterations}, train loss: {loss.item():.4f}')
-        if (i + 1) % 100 == 0:
-            run_validation(model, device, val_dataloader=val_dataloader)
+        # if (i + 1) % 5 == 0:
+        #     LOGGER.info(f'epoch {epoch + 1}/{num_epochs}, step {i + 1}/{n_iterations}, train loss: {loss.item():.4f}')
+
+    train_loss_avg = train_loss_accum / n_iterations
+    LOGGER.info(f'epoch {epoch + 1}/{num_epochs}, learning rate: {optimizer.param_groups[0]["lr"]: .8f} train loss avg: {train_loss_avg:.4f}')
+    scheduler.step(train_loss_avg)
+
+    if epoch % 20 == 0:
+        run_validation(model, device, val_dataloader)
+

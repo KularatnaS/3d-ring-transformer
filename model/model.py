@@ -13,24 +13,21 @@ class RingEmbedding(nn.Module):
     def __init__(self, d_ring_embedding: int, n_point_features: int, point_features_div: int,
                  not_testing_padding: bool = True):
         super().__init__()
-        layer2_div = int(point_features_div * 0.5)
-        assert d_ring_embedding % point_features_div == 0
-        assert d_ring_embedding % layer2_div == 0
-        layer_1_features = int(d_ring_embedding/point_features_div)
-        assert layer_1_features == 64
-        layer_2_features = int(d_ring_embedding/layer2_div)
-        assert layer_2_features == 128
 
         self.d_ring_embedding = d_ring_embedding
         self.n_point_features = n_point_features
 
-        self.conv1 = torch.nn.Conv1d(n_point_features, layer_1_features, 1, bias=not_testing_padding)
-        self.conv2 = torch.nn.Conv1d(layer_1_features, layer_2_features, 1, bias=not_testing_padding)
-        self.conv3 = torch.nn.Conv1d(layer_2_features, self.d_ring_embedding, 1, bias=not_testing_padding)
+        self.conv1 = torch.nn.Conv1d(n_point_features, n_point_features, 1, bias=not_testing_padding)
+        self.conv2 = torch.nn.Conv1d(n_point_features, 64, 1, bias=not_testing_padding)
+        self.conv3 = torch.nn.Conv1d(64, 64, 1, bias=not_testing_padding)
+        self.conv4 = torch.nn.Conv1d(64, 128, 1, bias=not_testing_padding)
+        self.conv5 = torch.nn.Conv1d(128, d_ring_embedding, 1, bias=not_testing_padding)
         self.relu = nn.ReLU()
-        self.ln1 = nn.LayerNorm(layer_1_features, elementwise_affine=not_testing_padding)
-        self.ln2 = nn.LayerNorm(layer_2_features, elementwise_affine=not_testing_padding)
-        self.ln3 = nn.LayerNorm(self.d_ring_embedding, elementwise_affine=not_testing_padding)
+        self.bn1 = nn.BatchNorm1d(n_point_features)
+        self.bn2 = nn.BatchNorm1d(64)
+        self.bn3 = nn.BatchNorm1d(64)
+        self.bn4 = nn.BatchNorm1d(128)
+        self.bn5 = nn.BatchNorm1d(d_ring_embedding)
 
     def forward(self, x):
         # x -> [batch, n_rings, n_points_per_ring, n_point_features]
@@ -39,21 +36,22 @@ class RingEmbedding(nn.Module):
         n_rings_per_bubble = x.shape[1]
 
         x = rearrange(x, 'batch a b c -> (batch a) c b')    # [batch * n_rings, n_point_features, n_points_per_ring]
-        x = self.conv1(x)                                   # [batch * n_rings, 64, n_points_per_ring]
-        per_point_embedded_features = rearrange(x, 'a b c -> a c b') # [batch * n_rings, n_points_per_ring, 64]
-        x = F.relu(self.ln1(per_point_embedded_features))            # [batch * n_rings, n_points_per_ring, 64]
+        x = self.conv1(x)                                   # [batch * n_rings, n_point_features, n_points_per_ring]
+        x = F.relu(self.bn1(x))                             # [batch * n_rings, n_points_per_ring, n_points_per_ring]
 
-        x = rearrange(x, 'a b c -> a c b')                  # [batch * n_rings, 64, n_points_per_ring]
-        x = self.conv2(x)                                   # [batch * n_rings, 128, n_points_per_ring]
-        x = rearrange(x, 'a b c -> a c b')                  # [batch * n_rings, n_points_per_ring, 128]
-        x = F.relu(self.ln2(x))                             # [batch * n_rings, n_points_per_ring, 128]
+        x = self.conv2(x)                                   # [batch * n_rings, 64, n_points_per_ring]
+        x = F.relu(self.bn2(x))                             # [batch * n_rings, 64, n_points_per_ring, ]
 
-        x = rearrange(x, 'a b c -> a c b')                  # [batch * n_rings, 128, n_points_per_ring]
-        x = self.conv3(x)                                   # [batch * n_rings, d_ring_embedding, n_points_per_ring]
-        x = rearrange(x, 'a b c -> a c b')                  # [batch * n_rings, n_points_per_ring, d_ring_embedding]
-        x = F.relu(self.ln3(x))                             # [batch * n_rings, n_points_per_ring, d_ring_embedding]
+        x = self.conv3(x)                                   # [batch * n_rings, 64, n_points_per_ring]
+        per_point_embedded_features = rearrange(x, 'a b c -> a c b')  # [batch * n_rings, n_points_per_ring, 64]
+        x = F.relu(self.bn3(x))                             # [batch * n_rings, n_points_per_ring, 64]
 
-        x = rearrange(x, 'a b c -> a c b')                  # [batch * n_rings, d_ring_embedding, n_points_per_ring]
+        x = self.conv4(x)                                   # [batch * n_rings, 128, n_points_per_ring]
+        x = F.relu(self.bn4(x))                             # [batch * n_rings, 128, n_points_per_ring]
+
+        x = self.conv5(x)                                   # [batch * n_rings, d_ring_embedding, n_points_per_ring]
+        x = F.relu(self.bn5(x))                             # [batch * n_rings, d_ring_embedding, n_points_per_ring]
+
         x = torch.max(x, 2, keepdim=True)[0]                # [batch * n_rings, d_ring_embedding, 1]
         x = rearrange(x, 'a b 1 -> a b')                    # [batch * n_rings, d_ring_embedding]
         x = rearrange(x, '(batch n_rings) b -> batch n_rings b', batch=batch_size, n_rings=n_rings_per_bubble)  # [batch, n_rings, d_ring_embedding]
@@ -96,11 +94,17 @@ class FeedForwardBlock(nn.Module):
         self.linear_1 = nn.Linear(d_ring_embedding, self.d_ff)  # w1 and b1
         self.dropout = nn.Dropout(dropout)
         self.linear_2 = nn.Linear(self.d_ff, d_ring_embedding)  # w2 and b2
+        self.ln1 = nn.LayerNorm(self.d_ff)
 
     def forward(self, x):
         # (batch, rings_per_bubble, d_ring_embedding) --> (batch, rings_per_bubble, d_ff) -->
         # (batch, rings_per_bubble, d_ring_embedding)
-        return self.linear_2(self.dropout(torch.relu(self.linear_1(x))))
+        x = self.linear_1(x)
+        x = self.ln1(x)
+        x = self.dropout(torch.relu(x))
+        return self.linear_2(x)
+
+       # return self.linear_2(self.dropout(torch.relu(self.linear_1(x))))
 
 
 class MultiHeadAttentionBlock(nn.Module):
@@ -202,8 +206,16 @@ class ClassificationLayer(nn.Module):
 
     def __init__(self, d_ring_embedding: int, point_features_div: int, n_classes_model: int) -> None:
         super().__init__()
-        assert d_ring_embedding % point_features_div == 0
-        self.linear = nn.Linear(int(d_ring_embedding/point_features_div) + d_ring_embedding, n_classes_model)
+        #assert d_ring_embedding % point_features_div == 0
+        self.linear_1 = nn.Linear(64 + d_ring_embedding, 512)
+        self.linear_2 = nn.Linear(512, 256)
+        self.linear_3 = nn.Linear(256, 256)
+        self.linear_4 = nn.Linear(256, 128)
+        self.linear_5 = nn.Linear(128, n_classes_model)
+        self.ln1 = nn.LayerNorm(512)
+        self.ln2 = nn.LayerNorm(256)
+        self.ln3 = nn.LayerNorm(256)
+        self.ln4 = nn.LayerNorm(128)
 
     @staticmethod
     def append_ring_embedding_to_per_point_embedded_features(x, per_point_embedded_features):
@@ -215,7 +227,12 @@ class ClassificationLayer(nn.Module):
 
     def forward(self, x, per_point_embedded_features):
         x = ClassificationLayer.append_ring_embedding_to_per_point_embedded_features(x, per_point_embedded_features)
-        return self.linear(x)  # [batch, n_rings, n_points_per_ring, n_classes_model]
+        x = torch.relu(self.ln1(self.linear_1(x)))
+        x = torch.relu(self.ln2(self.linear_2(x)))
+        x = torch.relu(self.ln3(self.linear_3(x)))
+        x = torch.relu(self.ln4(self.linear_4(x)))
+        x = self.linear_5(x)
+        return x
 
 
 class RingTransformerClassification(nn.Module):

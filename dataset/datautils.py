@@ -7,6 +7,20 @@ import torch
 from einops import rearrange
 
 
+def rings_to_laz_file(bubble_path, output_file_name):
+
+    data = torch.load(bubble_path)
+    point_tokens = data[0]
+
+    n_rings = point_tokens.shape[0]
+    points_per_ring = point_tokens.shape[1]
+    labels = np.arange(n_rings).reshape(n_rings, 1).repeat(points_per_ring, axis=1).flatten()
+
+    points = rearrange(point_tokens, 'rings points xyz ->  (rings points) xyz')
+
+    save_as_laz_file(points, output_file_name, labels)
+
+
 def bubble_to_laz_file(bubble_path, output_file_name):
 
     data = torch.load(bubble_path)

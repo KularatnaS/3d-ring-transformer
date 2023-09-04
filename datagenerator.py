@@ -1,7 +1,7 @@
 from dataset.dataset import TrainingBubblesCreator
 from config.config import get_config
 
-from dataset.datautils import bubble_to_laz_file
+from dataset.datautils import bubble_to_laz_file, rings_to_laz_file
 
 import logging
 LOGGER = logging.getLogger(__name__)
@@ -23,10 +23,12 @@ training_bubbles_creator = \
 
 input_data_dir = 'data/train-data/'
 output_data_dir = 'data/train-bubbles/'
-grid_resolution = 30.0
+grid_resolution = 60.0
 min_rings_per_laz = 3
 
-# training_bubbles_creator.run(input_data_dir=input_data_dir, output_data_dir=output_data_dir,
-#                                 grid_resolution=grid_resolution, min_rings_per_laz=min_rings_per_laz)
+training_bubbles_creator.run(input_data_dir=input_data_dir, output_data_dir=output_data_dir,
+                                grid_resolution=grid_resolution, min_rings_per_laz=min_rings_per_laz)
 
-bubble_to_laz_file('data/train-bubbles/pc_146_0_out_1.pt', 'view.laz')
+# bubble_path = 'data/train-bubbles/pc_11_0_out_32.pt'
+# bubble_to_laz_file(bubble_path, 'view_clas.laz')
+# rings_to_laz_file(bubble_path, 'view_rings.laz')

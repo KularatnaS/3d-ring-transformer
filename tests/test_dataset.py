@@ -465,6 +465,37 @@ class Test_3d_transformer_dataset(unittest.TestCase):
             assert label_tokens.shape == expected_label_tokens.shape
             assert np.array_equal(label_tokens, expected_label_tokens)
 
+
+    def test_split_bubble_to_rings(self):
+
+        # GIVEN
+        max_points_per_bubble = 25_000
+        points_per_ring = 3
+        rings_per_bubble = 2
+        n_point_features = 3
+        n_classes_model = 8
+
+        model_resolution = 0.08
+        points = np.array([[-1.0, 0.0, 0.0],
+                           [0.5, 0.0, 0.0],
+                           [0.51, 0.0, 0.0],
+                           [0.52, 0.0, 0.0],
+                           [0.0, 0.0, 0.0],
+                           [2.0, 0.0, 0.0]])
+        classification = np.array([0, 1, 2, 3, 4, 5])
+
+        # WHEN
+        training_bubbles_creator = \
+            TrainingBubblesCreator(max_points_per_bubble=max_points_per_bubble,
+                                   points_per_ring=points_per_ring,
+                                   rings_per_bubble=rings_per_bubble,
+                                   n_point_features=n_point_features,
+                                   model_resolution=model_resolution,
+                                   n_classes_model=n_classes_model)
+
+        point_tokens, label_tokens, n_missing_rings = training_bubbles_creator._split_bubble_to_rings(points, classification, None)
+        print(point_tokens)
+
     def test_training_bubbles_creator_bubble_to_rings_without_mask(self):
         # GIVEN
         max_points_per_bubble = 25_000

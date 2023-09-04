@@ -44,7 +44,7 @@ class TokenizedBubbleDataset(Dataset):
         data = torch.load(self.tokenized_bubbles[index])
 
         point_tokens = torch.from_numpy(data[0].astype(np.float32))
-        assert point_tokens.shape[0] == self.rings_per_bubble
+        assert point_tokens.shape[0] == self.rings_per_bubble, f'shape of point_tokens is {point_tokens.shape}'
 
         n_missing_rings = torch.tensor([data[2]], dtype=torch.int32)
         encoder_mask = torch.ones(self.rings_per_bubble, dtype=torch.int32)
@@ -126,6 +126,20 @@ class TrainingBubblesCreator:
                 LOGGER.info(f"Skipping {laz_file} because it has too few points")
 
     def _split_bubble_to_rings(self, points, classification, bubble_centre):
+        mid_point = (np.amax(points, axis=0)[0:3] + np.amin(points, axis=0)[0:3]) / 2.0
+        n_points = len(points)
+        neighbours = NearestNeighbors(n_neighbors=n_points,
+                                      algorithm='auto').fit(points)
+        _, indices = neighbours.kneighbors(mid_point.reshape(1, -1))
+        points = points[indices.flatten()]
+        points = points - mid_point
+        # get abs max of x, y, z
+        # max_abs = np.max(np.abs(points), axis=0)
+        # points = points / max_abs
+        assert len(points) == n_points
+
+        classification = classification[indices.flatten()]
+
         point_tokens = np.zeros((self.rings_per_bubble, self.points_per_ring, self.n_point_features))
         label_tokens = np.zeros((self.rings_per_bubble, self.points_per_ring))
 
@@ -138,7 +152,7 @@ class TrainingBubblesCreator:
             if end_index > len(points):
                 raise ValueError("end_index is greater than the number of points in the bubble")
 
-            point_tokens[i] = points[start_index:end_index] - bubble_centre
+            point_tokens[i] = points[start_index:end_index]
             label_tokens[i] = classification[start_index:end_index]
 
         return point_tokens, label_tokens, n_missing_rings
