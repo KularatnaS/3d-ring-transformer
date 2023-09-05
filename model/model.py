@@ -10,7 +10,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 class RingEmbedding(nn.Module):
-    def __init__(self, d_ring_embedding: int, n_point_features: int, point_features_div: int,
+    def __init__(self, d_ring_embedding: int, n_point_features: int, n_extracted_point_features: int,
                  not_testing_padding: bool = True):
         super().__init__()
 
@@ -18,16 +18,16 @@ class RingEmbedding(nn.Module):
         self.n_point_features = n_point_features
 
         self.conv1 = torch.nn.Conv1d(n_point_features, n_point_features, 1, bias=not_testing_padding)
-        self.conv2 = torch.nn.Conv1d(n_point_features, 64, 1, bias=not_testing_padding)
-        self.conv3 = torch.nn.Conv1d(64, 64, 1, bias=not_testing_padding)
-        self.conv4 = torch.nn.Conv1d(64, 128, 1, bias=not_testing_padding)
+        self.conv2 = torch.nn.Conv1d(n_point_features, n_extracted_point_features, 1, bias=not_testing_padding)
+        self.conv3 = torch.nn.Conv1d(n_extracted_point_features, n_extracted_point_features, 1, bias=not_testing_padding)
+        self.conv4 = torch.nn.Conv1d(n_extracted_point_features, 128, 1, bias=not_testing_padding)
         self.conv5 = torch.nn.Conv1d(128, d_ring_embedding, 1, bias=not_testing_padding)
         self.relu = nn.ReLU()
-        self.bn1 = nn.BatchNorm1d(n_point_features)
-        self.bn2 = nn.BatchNorm1d(64)
-        self.bn3 = nn.BatchNorm1d(64)
-        self.bn4 = nn.BatchNorm1d(128)
-        self.bn5 = nn.BatchNorm1d(d_ring_embedding)
+        self.bn1 = nn.BatchNorm1d(n_point_features, affine=not_testing_padding)
+        self.bn2 = nn.BatchNorm1d(n_extracted_point_features, affine=not_testing_padding)
+        self.bn3 = nn.BatchNorm1d(n_extracted_point_features, affine=not_testing_padding)
+        self.bn4 = nn.BatchNorm1d(128, affine=not_testing_padding)
+        self.bn5 = nn.BatchNorm1d(d_ring_embedding, affine=not_testing_padding)
 
     def forward(self, x):
         # x -> [batch, n_rings, n_points_per_ring, n_point_features]
@@ -39,12 +39,12 @@ class RingEmbedding(nn.Module):
         x = self.conv1(x)                                   # [batch * n_rings, n_point_features, n_points_per_ring]
         x = F.relu(self.bn1(x))                             # [batch * n_rings, n_points_per_ring, n_points_per_ring]
 
-        x = self.conv2(x)                                   # [batch * n_rings, 64, n_points_per_ring]
-        x = F.relu(self.bn2(x))                             # [batch * n_rings, 64, n_points_per_ring, ]
+        x = self.conv2(x)                                   # [batch * n_rings, n_extracted_point_features, n_points_per_ring]
+        x = F.relu(self.bn2(x))                             # [batch * n_rings, n_extracted_point_features, n_points_per_ring, ]
 
-        x = self.conv3(x)                                   # [batch * n_rings, 64, n_points_per_ring]
-        per_point_embedded_features = rearrange(x, 'a b c -> a c b')  # [batch * n_rings, n_points_per_ring, 64]
-        x = F.relu(self.bn3(x))                             # [batch * n_rings, n_points_per_ring, 64]
+        x = self.conv3(x)                                   # [batch * n_rings, n_extracted_point_features, n_points_per_ring]
+        per_point_embedded_features = rearrange(x, 'a b c -> a c b')  # [batch * n_rings, n_points_per_ring, n_extracted_point_features]
+        x = F.relu(self.bn3(x))                             # [batch * n_rings, n_points_per_ring, n_extracted_point_features]
 
         x = self.conv4(x)                                   # [batch * n_rings, 128, n_points_per_ring]
         x = F.relu(self.bn4(x))                             # [batch * n_rings, 128, n_points_per_ring]
@@ -103,8 +103,6 @@ class FeedForwardBlock(nn.Module):
         x = self.ln1(x)
         x = self.dropout(torch.relu(x))
         return self.linear_2(x)
-
-       # return self.linear_2(self.dropout(torch.relu(self.linear_1(x))))
 
 
 class MultiHeadAttentionBlock(nn.Module):
@@ -204,10 +202,9 @@ class Encoder(nn.Module):
 
 class ClassificationLayer(nn.Module):
 
-    def __init__(self, d_ring_embedding: int, point_features_div: int, n_classes_model: int) -> None:
+    def __init__(self, d_ring_embedding: int, n_extracted_point_features: int, n_classes_model: int) -> None:
         super().__init__()
-        #assert d_ring_embedding % point_features_div == 0
-        self.linear_1 = nn.Linear(64 + d_ring_embedding, 512)
+        self.linear_1 = nn.Linear(n_extracted_point_features + d_ring_embedding, 512)
         self.linear_2 = nn.Linear(512, 256)
         self.linear_3 = nn.Linear(256, 256)
         self.linear_4 = nn.Linear(256, 128)
@@ -253,13 +250,13 @@ class RingTransformerClassification(nn.Module):
         return self.classification_layer(src, per_point_embedded_features)  # [batch, n_rings, n_points_per_ring, n_classes_model]
 
 
-def build_classification_model(d_ring_embedding: int, n_point_features: int, point_features_div: int,
+def build_classification_model(d_ring_embedding: int, n_point_features: int, n_extracted_point_features: int,
                                rings_per_bubble: int, dropout: float, n_encoder_blocks: int, heads: int,
                                n_classes_model: int):
 
     # Embedding layer
     src_embed = RingEmbedding(d_ring_embedding=d_ring_embedding, n_point_features=n_point_features,
-                              point_features_div=point_features_div)
+                              n_extracted_point_features=n_extracted_point_features)
 
     # Positional encoding layer
     src_pos = PositionalEncoding(d_ring_embedding=d_ring_embedding, rings_per_bubble=rings_per_bubble, dropout=dropout)
@@ -277,7 +274,7 @@ def build_classification_model(d_ring_embedding: int, n_point_features: int, poi
     encoder = Encoder(layers=nn.ModuleList(encoder_blocks), d_ring_embedding=d_ring_embedding)
 
     # Create the classification layer
-    classification_layer = ClassificationLayer(d_ring_embedding=d_ring_embedding, point_features_div=point_features_div,
+    classification_layer = ClassificationLayer(d_ring_embedding=d_ring_embedding, n_extracted_point_features=n_extracted_point_features,
                                                n_classes_model=n_classes_model)
 
     classification_model = RingTransformerClassification(src_embed=src_embed, src_pos=src_pos, encoder=encoder,

@@ -27,7 +27,7 @@ model_resolution = config["model_resolution"]
 n_classes_model = config["n_classes_model"]
 batch_size = config["batch_size"]
 d_ring_embedding = config["d_ring_embedding"]
-point_features_div = config["point_features_div"]
+n_extracted_point_features = config["n_extracted_point_features"]
 dropout = config["dropout"]
 n_encoder_blocks = config["n_encoder_blocks"]
 heads = config["heads"]
@@ -44,7 +44,7 @@ dataloader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True, nu
 
 # create model
 model = build_classification_model(d_ring_embedding=d_ring_embedding, n_point_features=n_point_features,
-                                   point_features_div=point_features_div, rings_per_bubble=rings_per_bubble,
+                                   n_extracted_point_features=n_extracted_point_features, rings_per_bubble=rings_per_bubble,
                                    dropout=dropout, n_encoder_blocks=n_encoder_blocks, heads=heads,
                                    n_classes_model=n_classes_model).to(device)
 

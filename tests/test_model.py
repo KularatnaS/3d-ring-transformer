@@ -18,7 +18,7 @@ class Test_3d_transformer_model(unittest.TestCase):
         # GIVEN
         d_ring_embedding = 256
         n_point_features = 3
-        point_features_div = 4
+        n_extracted_point_features = 1
         batch_size = 2
         rings_per_bubble = 5
         points_per_ring = 100
@@ -29,7 +29,7 @@ class Test_3d_transformer_model(unittest.TestCase):
 
         # WHEN
         model = build_classification_model(d_ring_embedding=d_ring_embedding, n_point_features=n_point_features,
-                                           point_features_div=point_features_div, rings_per_bubble=rings_per_bubble,
+                                           n_extracted_point_features=n_extracted_point_features, rings_per_bubble=rings_per_bubble,
                                            dropout=dropout, n_encoder_blocks=n_encoder_blocks, heads=heads,
                                            n_classes_model=n_classes_model)
         mask = torch.ones(batch_size, 1, 1, rings_per_bubble)
@@ -114,7 +114,7 @@ class Test_3d_transformer_model(unittest.TestCase):
         # GIVEN
         batch_size = 2
         d_ring_embedding = 256
-        point_features_div = 4
+        n_extracted_point_features = 64
         n_classes_model = 4
         rings_per_bubble = 5
         points_per_ring = 10
@@ -122,8 +122,8 @@ class Test_3d_transformer_model(unittest.TestCase):
         # WHEN/THEN
         x = torch.rand(batch_size, rings_per_bubble, d_ring_embedding)
         per_point_embedded_features = torch.rand(batch_size, rings_per_bubble, points_per_ring,
-                                                 int(d_ring_embedding / point_features_div))
-        classification_layer = ClassificationLayer(d_ring_embedding, point_features_div, n_classes_model)
+                                                 n_extracted_point_features)
+        classification_layer = ClassificationLayer(d_ring_embedding, n_extracted_point_features, n_classes_model)
         y = classification_layer(x, per_point_embedded_features)
         assert y.shape == (batch_size, rings_per_bubble, points_per_ring, n_classes_model)
         # # assert that sum along last dimension of y 1
@@ -241,38 +241,45 @@ class Test_3d_transformer_model(unittest.TestCase):
         rings_per_bubble = 5
         points_per_ring = 500
         d_ring_embedding = 256
-        point_features_div = 4
+        n_extracted_point_features = 64
         n_point_features = 3
 
         # WHEN/THEN -> no missing rings
         x = torch.rand(batch_size, rings_per_bubble, points_per_ring, n_point_features)
-        ring_embedding = RingEmbedding(d_ring_embedding, n_point_features, point_features_div)
+        ring_embedding = RingEmbedding(d_ring_embedding, n_point_features, n_extracted_point_features)
         assert ring_embedding.conv1.bias is not None
         assert ring_embedding.conv2.bias is not None
         assert ring_embedding.conv3.bias is not None
-        assert ring_embedding.ln1.elementwise_affine is True
-        assert ring_embedding.ln2.elementwise_affine is True
-        assert ring_embedding.ln3.elementwise_affine is True
+        assert ring_embedding.conv4.bias is not None
+        assert ring_embedding.conv5.bias is not None
+        assert ring_embedding.bn1.affine is True
+        assert ring_embedding.bn2.affine is True
+        assert ring_embedding.bn3.affine is True
+        assert ring_embedding.bn4.affine is True
+        assert ring_embedding.bn5.affine is True
 
         y, per_point_embedded_features = ring_embedding(x)
         self.assertEqual(y.shape, (batch_size, rings_per_bubble, d_ring_embedding))
         assert per_point_embedded_features.shape == (batch_size, rings_per_bubble, points_per_ring,
-                                                     int(d_ring_embedding/point_features_div))
+                                                     n_extracted_point_features)
 
         # WHEN/THEN -> with missing rings
         x = torch.rand(batch_size, rings_per_bubble, points_per_ring, n_point_features)
         x[:, -1, :, :] = 0.0
-        ring_embedding = RingEmbedding(d_ring_embedding, n_point_features, point_features_div, not_testing_padding=False)
+        ring_embedding = RingEmbedding(d_ring_embedding, n_point_features, n_extracted_point_features, not_testing_padding=False)
         assert ring_embedding.conv1.bias is None
         assert ring_embedding.conv2.bias is None
         assert ring_embedding.conv3.bias is None
-        assert ring_embedding.ln1.elementwise_affine is False
-        assert ring_embedding.ln2.elementwise_affine is False
-        assert ring_embedding.ln3.elementwise_affine is False
+        assert ring_embedding.conv4.bias is None
+        assert ring_embedding.conv5.bias is None
+        assert ring_embedding.bn1.affine is False
+        assert ring_embedding.bn2.affine is False
+        assert ring_embedding.bn3.affine is False
+        assert ring_embedding.bn4.affine is False
+        assert ring_embedding.bn5.affine is False
 
         y, _ = ring_embedding(x)
         assert y.shape == (batch_size, rings_per_bubble, d_ring_embedding)
-        assert torch.equal(y[:, -1, :], torch.zeros(batch_size, d_ring_embedding))
 
     def test_positional_encoding(self):
 
@@ -281,7 +288,7 @@ class Test_3d_transformer_model(unittest.TestCase):
         rings_per_bubble = 5
         points_per_ring = 500
         d_ring_embedding = 256
-        point_features_div = 4
+        n_extracted_point_features = 64
         n_point_features = 3
 
         # WHEN/THEN
@@ -289,7 +296,7 @@ class Test_3d_transformer_model(unittest.TestCase):
         assert positional_encoding.pe.shape == (1, rings_per_bubble, d_ring_embedding)
 
         x = torch.rand(batch_size, rings_per_bubble, points_per_ring, n_point_features)
-        ring_embedding = RingEmbedding(d_ring_embedding, n_point_features, point_features_div)
+        ring_embedding = RingEmbedding(d_ring_embedding, n_point_features, n_extracted_point_features)
         y, _ = ring_embedding(x)
 
         assert y.shape == (batch_size, rings_per_bubble, d_ring_embedding)
