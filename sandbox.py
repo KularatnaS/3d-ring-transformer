@@ -11,25 +11,39 @@ print("Using device:", device)
 # spatial_shape = # spatial shape of your sparse tensor, spatial_shape[i] is shape of indices[:, 1 + i].
 # batch_size = # batch size of your sparse tensor.
 # x = spconv.SparseConvTensor(features, indices, spatial_shape, batch_size)
-features = torch.tensor([[0, 0, 5.0], [0, 0, 6.0], [0, 0, 7.0]])
+features = torch.tensor([[0, 0, 5.0], # batch 0
+                         [0, 0, 6.0],
+                         [0, 0, 7.0],
+                         [0, 0, 0.0],
+                         [1, 0, 0.0],
+                         [2, 0, 0.0],
+                         [0, 1, 0.0],
+                         [0, 2, 0.0],
+                         [0, 3, 0.0]])
 features = features.to(device)
 
 batch_size = 1
 batch_size = torch.tensor(batch_size)
 
 
-indices = torch.tensor([[0, 0, 0],
-                        [0, 0, 1],
-                        [0, 0, 2]], dtype=torch.int32)
+indices = torch.tensor([[0, 0, 0, 5],
+                        [0, 0, 0, 6],
+                        [0, 0, 0, 7],
+                        [0, 0, 0, 0],
+                        [0, 1, 0, 0],
+                        [0, 2, 0, 0],
+                        [0, 0, 1, 0],
+                        [0, 0, 2, 0],
+                        [0, 0, 3, 0]], dtype=torch.int32)
 indices = indices.int()
 indices = indices.to(device)
 # spatial_shape[i] is shape of indices[:, 1 + i]
 # ndim = indices.shape[1] - 1
-spatial_shape = np.array([1, 3], dtype=np.int32)
+spatial_shape = np.array([4, 5, 9], dtype=np.int32)
 spatial_shape = torch.from_numpy(spatial_shape)
 spatial_shape = spatial_shape.to(device)
 
-conv3d = spconv.SubMConv3d(3, 4, kernel_size=1, stride=1, padding=0, bias=False, indice_key="subm0").to(device)
+conv3d = spconv.SubMConv3d(3, 3, kernel_size=3, stride=1, padding=1, bias=False).to(device)
 
 x = spconv.SparseConvTensor(features, indices, spatial_shape, batch_size)
 y = conv3d(x)

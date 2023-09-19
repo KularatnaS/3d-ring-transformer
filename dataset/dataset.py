@@ -17,6 +17,8 @@ from dataset.datautils import get_data_from_laz_file, get_down_sampled_points_an
 import logging
 LOGGER = logging.getLogger(__name__)
 
+np.random.seed(0)
+
 
 def collate_fn(batch):
     """
@@ -54,16 +56,16 @@ class TokenizedBubbleDataset(Dataset):
         encoder_mask = encoder_mask.unsqueeze(0).unsqueeze(0)  # [1, 1, rings_per_bubble]
 
         label_tokens = data[1]
-        label_tokens_one_hot_encoded = []
+        label_tokens = torch.from_numpy(label_tokens.astype(np.float32))
 
-        # one hot encode labels
-        for counter, label_token in enumerate(label_tokens):
-            one_hot_encoded_matrix = np.zeros((len(label_token), self.n_classes_model))
-            if counter < self.rings_per_bubble - n_missing_rings:
-                one_hot_encoded_matrix[range(len(label_token)), label_token.astype(int)] = 1
-            label_tokens_one_hot_encoded.append(one_hot_encoded_matrix.astype(np.float32))
+        # # one hot encode labels
+        # for counter, label_token in enumerate(label_tokens):
+        #     one_hot_encoded_matrix = np.zeros((len(label_token), self.n_classes_model))
+        #     if counter < self.rings_per_bubble - n_missing_rings:
+        #         one_hot_encoded_matrix[range(len(label_token)), label_token.astype(int)] = 1
+        #     label_tokens_one_hot_encoded.append(one_hot_encoded_matrix.astype(np.float32))
 
-        return point_tokens, torch.from_numpy(np.asarray(label_tokens_one_hot_encoded)), encoder_mask
+        return point_tokens, label_tokens, encoder_mask
 
     def __len__(self):
         return len(self.tokenized_bubbles)
@@ -71,13 +73,24 @@ class TokenizedBubbleDataset(Dataset):
 
 class TrainingBubblesCreator:
     def __init__(self, max_points_per_bubble, points_per_ring, rings_per_bubble, n_point_features, model_resolution,
-                 n_classes_model):
+                 n_classes_model, ignore_index, ring_padding):
+        assert ring_padding >= 0
+
         self.max_points_per_bubble = max_points_per_bubble
+        self.max_points_sampled_per_bubble = int(max_points_per_bubble * (1 + ring_padding))
+        assert self.max_points_sampled_per_bubble >= max_points_per_bubble
+
         self.points_per_ring = points_per_ring
+        self.dense_points_per_ring = int(points_per_ring * (1 - ring_padding))
+        assert self.dense_points_per_ring <= points_per_ring
+        self.sparse_points_per_ring = points_per_ring - self.dense_points_per_ring
+
         self.rings_per_bubble = rings_per_bubble
         self.n_point_features = n_point_features
         self.model_resolution = model_resolution
         self.n_classes_model = n_classes_model
+        self.ignore_index = ignore_index
+        self.ring_padding = ring_padding
 
     def run(self, input_data_dir, output_data_dir, grid_resolution, min_rings_per_laz=3):
         # check if output directory exists, and if so, delete it and recreate it
@@ -96,12 +109,12 @@ class TrainingBubblesCreator:
                 get_down_sampled_points_and_classification(points, classification, self.model_resolution)
             del points, classification
 
-            total_n_points = down_sampled_points.shape[0]
-            if total_n_points > min_rings_per_laz * self.points_per_ring:
-                if self.max_points_per_bubble > total_n_points:
-                    n_neighbours = total_n_points
+            total_n_points_pc = down_sampled_points.shape[0]
+            if total_n_points_pc > min_rings_per_laz * self.points_per_ring:
+                if self.max_points_sampled_per_bubble > total_n_points_pc:
+                    n_neighbours = total_n_points_pc
                 else:
-                    n_neighbours = self.max_points_per_bubble
+                    n_neighbours = self.max_points_sampled_per_bubble
 
                 LOGGER.info(f"Calculating nearest neighbours")
                 neighbours = NearestNeighbors(n_neighbors=n_neighbours,
@@ -116,7 +129,7 @@ class TrainingBubblesCreator:
                     _, indices = neighbours.kneighbors(bubble_centre.reshape(1, -1))
                     point_tokens, label_tokens, n_missing_rings = \
                         self._split_bubble_to_rings(down_sampled_points[indices.flatten()],
-                                                    down_sampled_classification[indices.flatten()], bubble_centre)
+                                                    down_sampled_classification[indices.flatten()])
                     # get name of laz file
                     laz_file_name = Path(laz_file).stem
                     save_name = os.path.join(output_data_dir, f"{laz_file_name}_{counter}.pt")
@@ -125,18 +138,15 @@ class TrainingBubblesCreator:
             else:
                 LOGGER.info(f"Skipping {laz_file} because it has too few points")
 
-    def _split_bubble_to_rings(self, points, classification, bubble_centre):
+    def _split_bubble_to_rings(self, points, classification):
+
+        # normalised coordinates of points in bubble
         mid_point = (np.amax(points, axis=0)[0:3] + np.amin(points, axis=0)[0:3]) / 2.0
-        n_points = len(points)
-        neighbours = NearestNeighbors(n_neighbors=n_points,
+        neighbours = NearestNeighbors(n_neighbors=len(points),
                                       algorithm='auto').fit(points)
         _, indices = neighbours.kneighbors(mid_point.reshape(1, -1))
         points = points[indices.flatten()]
         points = points - mid_point
-        # get abs max of x, y, z
-        # max_abs = np.max(np.abs(points), axis=0)
-        # points = points / max_abs
-        assert len(points) == n_points
 
         classification = classification[indices.flatten()]
 
@@ -144,15 +154,58 @@ class TrainingBubblesCreator:
         label_tokens = np.zeros((self.rings_per_bubble, self.points_per_ring))
 
         n_valid_rings = math.floor(len(points)/self.points_per_ring)
-        n_missing_rings = self.rings_per_bubble - n_valid_rings
+        if n_valid_rings >= self.rings_per_bubble:
+            n_valid_rings = self.rings_per_bubble
+
+        if n_valid_rings > self.rings_per_bubble:
+            n_missing_rings = 0
+        else:
+            n_missing_rings = self.rings_per_bubble - n_valid_rings
+        assert n_missing_rings >= 0
 
         for i in range(n_valid_rings):
-            start_index = i * self.points_per_ring
-            end_index = (i + 1) * self.points_per_ring
+            # get dense points of the ring
+            start_index = i * self.dense_points_per_ring
+            end_index = (i + 1) * self.dense_points_per_ring
             if end_index > len(points):
                 raise ValueError("end_index is greater than the number of points in the bubble")
 
-            point_tokens[i] = points[start_index:end_index]
-            label_tokens[i] = classification[start_index:end_index]
+            point_tokens[i, 0:self.dense_points_per_ring] = points[start_index:end_index]
+            label_tokens[i, 0:self.dense_points_per_ring] = classification[start_index:end_index]
+
+            if n_valid_rings > 1:
+                # get sparse points of the ring - points with indices outside the range [start_index, end_index]
+                surrounding_ring_indices = np.delete(np.arange(n_valid_rings), i)
+                surrounding_ring_distance = np.abs(surrounding_ring_indices - i)
+                surrounding_ring_distance = surrounding_ring_distance.astype(float)
+                surrounding_ring_distance /= np.max(surrounding_ring_distance)
+                fraction_of_points_from_surrounding_ring = \
+                    np.exp(-np.power(surrounding_ring_distance, 4) / (2 * np.power(0.5, 4)))
+                fraction_of_points_from_surrounding_ring /= np.sum(fraction_of_points_from_surrounding_ring)
+                n_sparse_points_sampled = 0
+
+                n_surrounding_rings = len(surrounding_ring_indices)
+                for j in range(n_surrounding_rings):
+
+                    if j == n_surrounding_rings - 1:
+                        n_points_to_sample = self.sparse_points_per_ring - n_sparse_points_sampled
+                    else:
+                        n_points_to_sample = int(fraction_of_points_from_surrounding_ring[j] * self.sparse_points_per_ring)
+
+                    # use np.random.choice to sample points from the surrounding rings
+                    indices_of_points_to_sample = np.arange(surrounding_ring_indices[j] * self.dense_points_per_ring,
+                                                            (surrounding_ring_indices[j] + 1) * self.dense_points_per_ring)
+                    if len(indices_of_points_to_sample) < n_points_to_sample:
+                        sparse_points_indices = np.random.choice(len(self.dense_points_per_ring), n_points_to_sample,
+                                                                 replace=True)
+                    else:
+                        sparse_points_indices = np.random.choice(indices_of_points_to_sample, n_points_to_sample,
+                                                                 replace=False)
+                    point_tokens[i, (self.dense_points_per_ring + n_sparse_points_sampled):
+                                    (self.dense_points_per_ring + n_sparse_points_sampled + n_points_to_sample)] = \
+                        points[sparse_points_indices]
+                    n_sparse_points_sampled += n_points_to_sample
+
+            label_tokens[i, self.dense_points_per_ring:] = self.ignore_index
 
         return point_tokens, label_tokens, n_missing_rings

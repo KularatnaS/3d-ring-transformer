@@ -32,6 +32,7 @@ dropout = config["dropout"]
 n_encoder_blocks = config["n_encoder_blocks"]
 heads = config["heads"]
 learning_rate = config["learning_rate"]
+ignore_index = config["ignore_index"]
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device:", device)
@@ -78,7 +79,7 @@ def run_validation(model, device, val_dataloader):
 
 
 # define criterion and optimizer
-criterion = torch.nn.CrossEntropyLoss()
+criterion = torch.nn.CrossEntropyLoss(ignore_index=ignore_index)
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
 # training loop
@@ -97,7 +98,7 @@ for epoch in range(num_epochs):
         model.train()
         # data batch
         data = batch[0].to(device)
-        labels = batch[1].to(device)
+        labels = batch[1].type(torch.LongTensor).to(device)
         mask = batch[2].to(device)
 
         # forward pass
@@ -105,8 +106,7 @@ for epoch in range(num_epochs):
         y_predicted = rearrange(y_predicted, 'a b c d -> (a b c) d')
 
         # calculate loss
-        labels = rearrange(labels, 'a b c d -> (a b c) d')
-        labels = torch.argmax(labels, dim=1)  # one hot encoded to class labels
+        labels = rearrange(labels, 'a b c -> (a b c)')
         loss = criterion(y_predicted, labels)
 
         train_loss_accum += loss.item()

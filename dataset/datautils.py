@@ -7,6 +7,18 @@ import torch
 from einops import rearrange
 
 
+def visualise_individual_ring(bubble_path, output_file_name):
+    data = torch.load(bubble_path)
+    point_tokens = data[0]
+
+    points = point_tokens[1]
+    labels = data[1][1]
+    # replace ignore index with 100
+    labels[labels == -100] = 100
+
+    save_as_laz_file(points, output_file_name, labels)
+
+
 def rings_to_laz_file(bubble_path, output_file_name):
 
     data = torch.load(bubble_path)
