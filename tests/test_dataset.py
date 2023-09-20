@@ -13,6 +13,8 @@ from dataset.datautils import get_data_from_laz_file, down_sample_point_data, ge
     bounding_box_calculator, calc_train_bubble_centres, save_as_laz_file
 from dataset.dataset import TrainingBubblesCreator, TokenizedBubbleDataset, collate_fn
 
+np.random.seed(0)
+
 import logging
 LOGGER = logging.getLogger(__name__)
 
@@ -52,6 +54,46 @@ class Test_3d_transformer_dataset(unittest.TestCase):
         assert torch.equal(point_tokens, torch.stack([bubble_0, bubble_1]))
         assert torch.equal(label_tokens, torch.stack([label_token_0, label_token_1]))
         assert torch.equal(n_missing_rings, torch.stack([n_missing_rings_0, n_missing_rings_1]))
+
+    def test_ring_padding(self):
+        # GIVEN
+        max_points_per_bubble = 10
+        points_per_ring = 4
+        rings_per_bubble = 2
+        n_point_features = 3
+        model_resolution = 0.01
+        n_classes_model = 4
+        ignore_index = -100
+        ring_padding = 0.25
+
+        points = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.1], [0.0, 0.0, 0.2], [0.0, 0.0, 0.3], [0.0, 0.0, 0.4],
+                           [0.0, 0.0, 0.5], [0.0, 0.0, 0.6], [0.0, 0.0, 0.7], [0.0, 0.0, 0.8], [0.0, 0.0, 0.9],
+                           [0.0, 0.0, 1.0]])
+        classification = np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+
+        # WHEN / THEN
+        training_bubbles_creator = \
+            TrainingBubblesCreator(max_points_per_bubble=max_points_per_bubble,
+                                   points_per_ring=points_per_ring,
+                                   rings_per_bubble=rings_per_bubble,
+                                   n_point_features=n_point_features,
+                                   model_resolution=model_resolution,
+                                   n_classes_model=n_classes_model,
+                                   ignore_index=ignore_index,
+                                   ring_padding=ring_padding)
+
+        point_tokens, label_tokens, n_missing_rings = training_bubbles_creator._split_bubble_to_rings(points,
+                                                                                                      classification)
+        expected_point_tokens = np.array([[[0., 0., 0.], [0., 0., -0.1], [0., 0., 0.1], [0., 0., -0.3]],
+                                          [[0., 0., 0.2], [0., 0., -0.2], [0., 0., -0.3], [0., 0., 0.0]]])
+        expected_label_tokens = np.array([[5, 4, 6, ignore_index], [7, 3, 2, ignore_index]])
+
+        point_token_1 = point_tokens[0]
+        point_token_2 = point_tokens[1]
+        assert np.any(np.isin(point_token_1, point_token_2))
+        assert np.any(np.isin(point_token_2, point_token_1))
+
+        assert np.allclose(label_tokens, expected_label_tokens)
 
     def test_dataloader_batch_size_2(self):
         # GIVEN
