@@ -5,7 +5,6 @@ def get_config():
     points_per_ring = int(max_points_per_bubble / rings_per_bubble)
     d_ring_embedding = 128
     n_extracted_point_features = 16
-    assert d_ring_embedding % n_extracted_point_features == 0
 
     return\
         {

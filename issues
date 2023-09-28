@@ -1,6 +1,0 @@
-laz reading precision
-normalisation of coordinates
-randomise creation of training bubbles(tokens)
-batch dimension in data loader is currently limited to 1
-reguralisation of 64 x 64 transformation matrix in ring embedding
-replace softmax with logsoftmax ? for numerical stability

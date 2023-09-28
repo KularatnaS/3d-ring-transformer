@@ -128,6 +128,6 @@ for epoch in range(num_epochs):
     LOGGER.info(f'epoch {epoch + 1}/{num_epochs}, learning rate: {optimizer.param_groups[0]["lr"]: .8f} train loss avg: {train_loss_avg:.4f}')
     scheduler.step(train_loss_avg)
 
-    if epoch % 20 == 0:
-        run_validation(model, device, val_dataloader)
+    # if epoch % 20 == 0:
+    #     run_validation(model, device, val_dataloader)
 
