@@ -21,7 +21,7 @@ def get_config():
             "dropout": 0.0,
             "n_encoder_blocks": 6,
             "heads": 8,
-            "learning_rate": 0.01,
+            "learning_rate": 0.001,
             "ignore_index": -100,
             "ring_padding": 0.2,
         }

@@ -27,7 +27,7 @@ training_bubbles_creator = \
 input_data_dir = 'data/train-data/'
 output_data_dir = 'data/train-bubbles/'
 grid_resolution = 60.0
-min_rings_per_laz = 3
+min_rings_per_laz = rings_per_bubble
 
 training_bubbles_creator.run(input_data_dir=input_data_dir, output_data_dir=output_data_dir,
                                 grid_resolution=grid_resolution, min_rings_per_laz=min_rings_per_laz)

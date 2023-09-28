@@ -151,7 +151,6 @@ class RingEmbedding(nn.Module):
 
 def batch_to_spconv_tensor(x, model_resolution):
     device = x.device
-    #model_resolution = torch.tensor(model_resolution).to(device)
 
     # x -> [batch, n_rings, n_points_per_ring, n_point_features]
     batch_size = x.shape[0] * x.shape[1]
