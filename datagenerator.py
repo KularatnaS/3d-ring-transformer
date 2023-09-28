@@ -29,10 +29,11 @@ output_data_dir = 'data/train-bubbles/'
 grid_resolution = 60.0
 min_rings_per_laz = 3
 
-# training_bubbles_creator.run(input_data_dir=input_data_dir, output_data_dir=output_data_dir,
-#                                 grid_resolution=grid_resolution, min_rings_per_laz=min_rings_per_laz)
+training_bubbles_creator.run(input_data_dir=input_data_dir, output_data_dir=output_data_dir,
+                                grid_resolution=grid_resolution, min_rings_per_laz=min_rings_per_laz)
 
 bubble_path = 'data/train-bubbles/pc_11_0_out_32.pt'
 bubble_to_laz_file(bubble_path, 'view_clas.laz')
 rings_to_laz_file(bubble_path, 'view_rings.laz')
-visualise_individual_ring(bubble_path, 'view_ring_0.laz')
+visualise_individual_ring(bubble_path, 'view_ring_0.laz', ring_index=0)
+visualise_individual_ring(bubble_path, 'view_ring_1.laz', ring_index=1)

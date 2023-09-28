@@ -10,6 +10,8 @@ from sklearn.neighbors import NearestNeighbors
 import torch
 from torch.utils.data import Dataset
 
+from einops import rearrange
+
 from dataset.datautils import get_data_from_laz_file, get_down_sampled_points_and_classification, \
     bounding_box_calculator, calc_train_bubble_centres
 

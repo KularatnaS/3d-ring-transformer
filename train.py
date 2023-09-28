@@ -1,7 +1,7 @@
 import torch.nn
 
 from dataset.dataset import collate_fn, TokenizedBubbleDataset
-from dataset.datautils import save_as_laz_file
+from dataset.datautils import save_as_laz_file, remove_padding_points_from_bubble
 from config.config import get_config
 from model.model import build_classification_model
 
@@ -33,6 +33,7 @@ n_encoder_blocks = config["n_encoder_blocks"]
 heads = config["heads"]
 learning_rate = config["learning_rate"]
 ignore_index = config["ignore_index"]
+ring_padding = config["ring_padding"]
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device:", device)
@@ -47,7 +48,7 @@ dataloader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True, nu
 model = build_classification_model(d_ring_embedding=d_ring_embedding, n_point_features=n_point_features,
                                    n_extracted_point_features=n_extracted_point_features, rings_per_bubble=rings_per_bubble,
                                    dropout=dropout, n_encoder_blocks=n_encoder_blocks, heads=heads,
-                                   n_classes_model=n_classes_model).to(device)
+                                   n_classes_model=n_classes_model, model_resolution=model_resolution).to(device)
 
 # prepare validation dataset
 val_data_dir = 'data/val-bubbles/'
@@ -74,6 +75,8 @@ def run_validation(model, device, val_dataloader):
             print(np.unique(labels))
             # save as laz file
             all_points = rearrange(point_tokens, '1 a b c -> (a b) c').cpu().numpy()
+            all_points, labels = remove_padding_points_from_bubble(all_points, labels, rings_per_bubble, points_per_ring,
+                                                                   ring_padding)
             file_name = f'data/visualise-val/view_{i}.laz'
             save_as_laz_file(points=all_points, classification=labels, filename=file_name)
 

@@ -10,7 +10,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from dataset.datautils import get_data_from_laz_file, down_sample_point_data, get_down_sampled_points_and_classification, \
-    bounding_box_calculator, calc_train_bubble_centres, save_as_laz_file
+    bounding_box_calculator, calc_train_bubble_centres, save_as_laz_file, remove_padding_points_from_bubble
 from dataset.dataset import TrainingBubblesCreator, TokenizedBubbleDataset, collate_fn
 
 np.random.seed(0)
@@ -20,6 +20,33 @@ LOGGER = logging.getLogger(__name__)
 
 
 class Test_3d_transformer_dataset(unittest.TestCase):
+
+    def test_remove_padding_points_from_bubble(self):
+        # GIVEN
+        points = np.array([[0.0, 0.0, 0.0],
+                           [0.0, 0.0, 0.1],
+                           [0.0, 0.0, 0.2],
+                           [0.0, 0.0, 0.3],
+                           [0.0, 0.0, 0.4],
+                           [0.0, 0.0, 0.5],
+                           [0.0, 0.0, 0.6],
+                           [0.0, 0.0, 0.7],
+                           ])
+        labels = np.array([0, 1, 2, 3, 4, 5, 6, 7])
+        points_per_ring = 4
+        n_rings_per_bubble = 2
+        ring_padding = 0.5
+
+        points_out, labels_out = remove_padding_points_from_bubble(points, labels, n_rings_per_bubble, points_per_ring,
+                                                                   ring_padding)
+        expected_points_out = np.array([[0.0, 0.0, 0.0],
+                                        [0.0, 0.0, 0.1],
+                                        [0.0, 0.0, 0.4],
+                                        [0.0, 0.0, 0.5]
+                                       ])
+        expected_labels_out = np.array([0, 1, 4, 5])
+        assert np.allclose(points_out, expected_points_out)
+        assert np.allclose(labels_out, expected_labels_out)
 
     def test_collate_fn(self):
         # GIVEN

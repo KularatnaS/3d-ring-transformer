@@ -1,10 +1,10 @@
 def get_config():
     max_points_per_bubble = 100_000
-    rings_per_bubble = 20
+    rings_per_bubble = 5
     assert max_points_per_bubble % rings_per_bubble == 0
     points_per_ring = int(max_points_per_bubble / rings_per_bubble)
-    d_ring_embedding = 512
-    n_extracted_point_features = 64
+    d_ring_embedding = 128
+    n_extracted_point_features = 16
     assert d_ring_embedding % n_extracted_point_features == 0
 
     return\
@@ -23,5 +23,5 @@ def get_config():
             "heads": 8,
             "learning_rate": 0.01,
             "ignore_index": -100,
-            "ring_padding": 0.4,
+            "ring_padding": 0.2,
         }

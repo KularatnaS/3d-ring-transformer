@@ -4,8 +4,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from model.model import RingEmbedding, PositionalEncoding, FeedForwardBlock, MultiHeadAttentionBlock, \
+from model.model import PositionalEncoding, FeedForwardBlock, MultiHeadAttentionBlock, \
     ResidualConnection, EncoderBlock, Encoder, ClassificationLayer, build_classification_model
+
+from model.spconv_unet_ring_embedding import RingEmbedding, batch_to_spconv_tensor
 
 
 import logging
@@ -16,6 +18,7 @@ class Test_3d_transformer_model(unittest.TestCase):
 
     def test_build_classification_model(self):
         # GIVEN
+        device = torch.device("cuda")
         d_ring_embedding = 256
         n_point_features = 3
         n_extracted_point_features = 1
@@ -26,14 +29,16 @@ class Test_3d_transformer_model(unittest.TestCase):
         n_encoder_blocks = 6
         heads = 8
         n_classes_model = 4
+        model_resolution = 0.01
 
         # WHEN
         model = build_classification_model(d_ring_embedding=d_ring_embedding, n_point_features=n_point_features,
                                            n_extracted_point_features=n_extracted_point_features, rings_per_bubble=rings_per_bubble,
                                            dropout=dropout, n_encoder_blocks=n_encoder_blocks, heads=heads,
-                                           n_classes_model=n_classes_model)
-        mask = torch.ones(batch_size, 1, 1, rings_per_bubble)
-        x = torch.rand(batch_size, rings_per_bubble, points_per_ring, n_point_features)
+                                           n_classes_model=n_classes_model, model_resolution=model_resolution)
+        model.to(device)
+        mask = torch.ones(batch_size, 1, 1, rings_per_bubble).to(device)
+        x = torch.rand(batch_size, rings_per_bubble, points_per_ring, n_point_features).to(device)
         y = model(x, mask)
 
         # THEN
@@ -237,66 +242,83 @@ class Test_3d_transformer_model(unittest.TestCase):
 
     def test_ring_embedding(self):
         # GIVEN
-        batch_size = 2
-        rings_per_bubble = 5
-        points_per_ring = 500
-        d_ring_embedding = 256
-        n_extracted_point_features = 64
+        device = torch.device("cuda")
         n_point_features = 3
+        n_extracted_point_features = 64
+        d_ring_embedding = 512
+        model_resolution = 0.01
+        x = torch.randn(2, 2, 1000, 3)
 
-        # WHEN/THEN -> no missing rings
-        x = torch.rand(batch_size, rings_per_bubble, points_per_ring, n_point_features)
-        ring_embedding = RingEmbedding(d_ring_embedding, n_point_features, n_extracted_point_features)
-        assert ring_embedding.conv1.bias is not None
-        assert ring_embedding.conv2.bias is not None
-        assert ring_embedding.conv3.bias is not None
-        assert ring_embedding.conv4.bias is not None
-        assert ring_embedding.conv5.bias is not None
-        assert ring_embedding.bn1.affine is True
-        assert ring_embedding.bn2.affine is True
-        assert ring_embedding.bn3.affine is True
-        assert ring_embedding.bn4.affine is True
-        assert ring_embedding.bn5.affine is True
+        x = x.to(torch.float32).to(device)
 
-        y, per_point_embedded_features = ring_embedding(x)
-        self.assertEqual(y.shape, (batch_size, rings_per_bubble, d_ring_embedding))
-        assert per_point_embedded_features.shape == (batch_size, rings_per_bubble, points_per_ring,
-                                                     n_extracted_point_features)
+        # WHEN/THEN
+        ring_embedding = RingEmbedding(n_point_features, n_extracted_point_features, model_resolution, d_ring_embedding)
+        ring_embedding.to(device)
+        ring_embeddings, per_point_features_extracted = ring_embedding(x)
 
-        # WHEN/THEN -> with missing rings
-        x = torch.rand(batch_size, rings_per_bubble, points_per_ring, n_point_features)
-        x[:, -1, :, :] = 0.0
-        ring_embedding = RingEmbedding(d_ring_embedding, n_point_features, n_extracted_point_features, not_testing_padding=False)
-        assert ring_embedding.conv1.bias is None
-        assert ring_embedding.conv2.bias is None
-        assert ring_embedding.conv3.bias is None
-        assert ring_embedding.conv4.bias is None
-        assert ring_embedding.conv5.bias is None
-        assert ring_embedding.bn1.affine is False
-        assert ring_embedding.bn2.affine is False
-        assert ring_embedding.bn3.affine is False
-        assert ring_embedding.bn4.affine is False
-        assert ring_embedding.bn5.affine is False
+        assert ring_embeddings.shape == (x.shape[0], x.shape[1], d_ring_embedding)
+        assert per_point_features_extracted.shape == (x.shape[0], x.shape[1], x.shape[2], n_extracted_point_features)
 
-        y, _ = ring_embedding(x)
-        assert y.shape == (batch_size, rings_per_bubble, d_ring_embedding)
+    def test_batch_to_spconv_tensor(self):
+
+        # GIVEN
+        model_resolution = 0.1
+        x = torch.tensor \
+                ([
+                    [  # bubble 0
+                        [[0., 0., 0.], [0., 0., -0.2], [0.1, 0.0, 0.0]],  # ring 0
+                        [[0., 0., 0.1], [0., 0., 0.2], [0.0, 0.2, 0.0]]  # ring 1
+                    ],
+                    [  # bubble 1
+                        [[0., 0., 0.01], [0., 0., -0.11], [0.2, 0.0, 0.0]],  # ring 0
+                        [[0., 0., 0.11], [0., 0., 0.21], [0.0, 0.3, 0.0]]  # ring 1
+                    ]
+                ], dtype=torch.float32)
+
+        # WHEN
+        features, indices, spatial_shape, batch_size = batch_to_spconv_tensor(x, model_resolution)
+        expected_features = x.reshape(-1, 3).to(torch.float32)
+        expected_indices = torch.tensor([[0, 0, 0, 2],
+                                        [0, 0, 0, 0],
+                                        [0, 1, 0, 2],
+                                        [1, 0, 0, 3],
+                                        [1, 0, 0, 4],
+                                        [1, 0, 2, 2],
+                                        [2, 0, 0, 2],
+                                        [2, 0, 0, 0],
+                                        [2, 2, 0, 2],
+                                        [3, 0, 0, 3],
+                                        [3, 0, 0, 4],
+                                        [3, 0, 3, 2]])
+        expected_indices = expected_indices.to(torch.int32)
+        expected_spatial_shape = torch.tensor([3, 4, 5]).to(torch.int32)
+        expected_batch_size = torch.tensor(4).to(torch.int32)
+
+        assert torch.equal(features, expected_features)
+        assert torch.equal(indices, expected_indices)
+        assert torch.equal(spatial_shape, expected_spatial_shape)
+        assert torch.equal(batch_size, expected_batch_size)
 
     def test_positional_encoding(self):
 
         # GIVEN
+        device = torch.device("cuda")
         batch_size = 2
         rings_per_bubble = 5
         points_per_ring = 500
         d_ring_embedding = 256
         n_extracted_point_features = 64
         n_point_features = 3
+        model_resolution = 0.01
 
         # WHEN/THEN
-        positional_encoding = PositionalEncoding(d_ring_embedding, rings_per_bubble, dropout=0.0)
+        positional_encoding = PositionalEncoding(d_ring_embedding, rings_per_bubble, dropout=0.0).to(device)
         assert positional_encoding.pe.shape == (1, rings_per_bubble, d_ring_embedding)
 
-        x = torch.rand(batch_size, rings_per_bubble, points_per_ring, n_point_features)
-        ring_embedding = RingEmbedding(d_ring_embedding, n_point_features, n_extracted_point_features)
+        x = torch.rand(batch_size, rings_per_bubble, points_per_ring, n_point_features).to(device)
+        ring_embedding = \
+            RingEmbedding(n_point_features, n_extracted_point_features, model_resolution, d_ring_embedding).to(device)
+
         y, _ = ring_embedding(x)
 
         assert y.shape == (batch_size, rings_per_bubble, d_ring_embedding)
