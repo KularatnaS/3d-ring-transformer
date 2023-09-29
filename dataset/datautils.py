@@ -9,12 +9,13 @@ from einops import rearrange
 
 def remove_padding_points_from_bubble(points, labels, n_rings_per_bubble, points_per_ring, ring_padding):
     dense_points_per_ring = int(points_per_ring * (1 - ring_padding))
-    points = rearrange(points, '(rings points) xyz -> rings points xyz', rings=n_rings_per_bubble, points=points_per_ring)
+
+    if points is not None:
+        points = rearrange(points, '(rings points) xyz -> rings points xyz', rings=n_rings_per_bubble, points=points_per_ring)
+        points = points[:, 0:dense_points_per_ring, :]
+        points = rearrange(points, 'rings points xyz -> (rings points) xyz')
+
     labels = rearrange(labels, '(rings points) -> rings points', rings=n_rings_per_bubble, points=points_per_ring)
-
-    points = points[:, 0:dense_points_per_ring, :]
-    points = rearrange(points, 'rings points xyz -> (rings points) xyz')
-
     labels = labels[:, 0:dense_points_per_ring]
     labels = rearrange(labels, 'rings points -> (rings points)')
 
