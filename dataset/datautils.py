@@ -48,7 +48,7 @@ def rings_to_laz_file(bubble_path, output_file_name):
     save_as_laz_file(points, output_file_name, labels)
 
 
-def bubble_to_laz_file(bubble_path, output_file_name):
+def bubble_to_laz_file(bubble_path, output_file_name, ignore_index, n_classes_model):
 
     data = torch.load(bubble_path)
     point_tokens = data[0]
@@ -56,6 +56,7 @@ def bubble_to_laz_file(bubble_path, output_file_name):
 
     labels = data[1]
     labels = rearrange(labels, 'rings labels -> (rings labels)')
+    labels[labels == ignore_index] = n_classes_model
     save_as_laz_file(points, output_file_name, labels)
 
 

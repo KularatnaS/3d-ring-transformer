@@ -28,7 +28,7 @@ bubbles_creator = \
                            model_resolution=model_resolution, n_classes_model=n_classes_model,
                            ignore_index=ignore_index, ring_padding=ring_padding)
 
-grid_resolution = 60.0
+grid_resolution = 120.0
 min_rings_per_laz = rings_per_bubble
 
 # train data
@@ -46,8 +46,8 @@ bubbles_creator.run(input_data_dir=os.path.join(laz_data_dir, 'val-data'),
                     output_data_dir=os.path.join(bubble_data_dir, 'val-bubbles'),
                     grid_resolution=grid_resolution, min_rings_per_laz=min_rings_per_laz)
 
-# bubble_path = 'data/train-bubbles/pc_11_0_out_32.pt'
-# bubble_to_laz_file(bubble_path, 'view_clas.laz')
+# bubble_path = 'data/bubbles/train-bubbles/5080_54435_out_108.pt'
+# bubble_to_laz_file(bubble_path, 'view_clas.laz', ignore_index=ignore_index, n_classes_model=n_classes_model)
 # rings_to_laz_file(bubble_path, 'view_rings.laz')
 # visualise_individual_ring(bubble_path, 'view_ring_0.laz', ring_index=0)
 # visualise_individual_ring(bubble_path, 'view_ring_1.laz', ring_index=1)
