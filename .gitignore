@@ -1,4 +1,3 @@
-data/
 .pytest_cache/
 ringtransformer.egg-info/
 __pycache__/
