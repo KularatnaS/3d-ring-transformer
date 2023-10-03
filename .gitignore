@@ -3,3 +3,4 @@ ringtransformer.egg-info/
 __pycache__/
 train-bubbles/
 train-data-mini/
+*.laz

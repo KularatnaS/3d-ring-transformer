@@ -1,29 +1,27 @@
 from pathlib import Path
+import datetime
 
 
 def get_config():
-    max_points_per_bubble = 400_000
-    rings_per_bubble = 20
-    assert max_points_per_bubble % rings_per_bubble == 0
-    points_per_ring = int(max_points_per_bubble / rings_per_bubble)
-    d_ring_embedding = 512
-    n_extracted_point_features = 64
+    rings_per_bubble = 2
+    points_per_ring = 50_000
 
     return\
         {
-            "model_resolution": 0.25,
+            "model_resolution": 0.5,
             "n_classes_model": 7,
-            "d_ring_embedding": d_ring_embedding,
-            "n_extracted_point_features": n_extracted_point_features,
+            "d_ring_embedding": 32,
+            "n_extracted_point_features": 16,
             "n_point_features": 3,  # x, y, z
-            "max_points_per_bubble": max_points_per_bubble,
             "points_per_ring": points_per_ring,
             "rings_per_bubble": rings_per_bubble,
-            "dropout": 0.0,
-            "n_encoder_blocks": 6,
-            "heads": 8,
+            "max_points_per_bubble": points_per_ring * rings_per_bubble,
+            "extra_rings_for_last_ring_padding": 2,
+            "dropout": 0.01,
+            "n_encoder_blocks": 3,
+            "heads": 4,
             "ignore_index": -100,
-            "ring_padding": 0.2,
+            "ring_padding": 0.1,
 
             # Train config
             "laz_data_dir": "data/laz-data/",
@@ -33,8 +31,13 @@ def get_config():
             "learning_rate": 0.001,
             "model_folder": "train-artefacts/model-checkpoints/",
             "num_epochs": 100000,
-            "preload": None,  # 'train-artefacts/model-checkpoints/checkpoint-29.pt',
-            "tensorboard_log_dir": "train-artefacts/tensorboard-logs/"
+            "preload": None,
+            "tensorboard_log_dir": "train-artefacts/tensorboard-logs/" +
+                                   datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S"),
+            "augment_train_data": True,
+
+            # Test config
+            "test_model_path": "train-artefacts/model-checkpoints/checkpoint-13.pt",
         }
 
 

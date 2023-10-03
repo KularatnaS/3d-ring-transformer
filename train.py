@@ -1,18 +1,21 @@
 import os
+import datetime
+
 import torch.nn
+from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 
 from dataset.dataset import collate_fn, TokenizedBubbleDataset
 from config.config import get_config, get_weights_file_path
 from model.model import build_classification_model
-
-from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter
+from dataset.datautils import save_as_laz_file
 
 from einops import rearrange
 import numpy as np
 import math
 
-from train_utils.train_utils import run_validation, run_test
+from train_utils.train_utils import run_validation
+from train_utils.bubble_augmenter import BatchAugmenter
 
 from tqdm import tqdm
 
@@ -45,6 +48,7 @@ preload = config["preload"]
 tensorboard_log_dir = config["tensorboard_log_dir"]
 bubble_data_dir = config["bubble_data_dir"]
 test_data_vis_dir = config["test_data_vis_dir"]
+augment_train_data = config["augment_train_data"]
 
 dirs_to_create = [model_folder, tensorboard_log_dir, test_data_vis_dir]
 for dir_to_create in dirs_to_create:
@@ -100,7 +104,7 @@ if preload:
 total_samples = len(train_dataset)
 n_iterations = math.ceil(total_samples / batch_size)
 
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=10, verbose=True)
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=2, verbose=True)
 LOGGER.info(f'batch size: {batch_size}')
 LOGGER.info(f'n_iterations: {n_iterations}')
 
@@ -109,8 +113,21 @@ for epoch in range(initial_epoch, num_epochs):
     batch_iterator = tqdm(train_dataloader, desc=f'Processing epoch {epoch}')
     for batch in batch_iterator:
         model.train()
+
         # data batch
-        data = batch[0].to(device)
+        data = batch[0]
+        if augment_train_data:
+            # labels_temp = rearrange(batch[1], 'a b c -> (a b c)')
+            # save_as_laz_file(points=rearrange(data, '1 a b c -> (a b) c').numpy(), classification=labels_temp, filename='aug-before.laz')
+
+            batch_augmenter = BatchAugmenter(data, model_resolution)
+            data = batch_augmenter.augment()
+
+            # all_points = rearrange(data, '1 a b c -> (a b) c')
+            # save_as_laz_file(points=all_points.numpy(), classification=labels_temp, filename='aug-after.laz')
+            # raise Exception('stop')
+        data = data.to(device)
+
         labels = batch[1].type(torch.LongTensor).to(device)
         mask = batch[2].to(device)
 
@@ -150,7 +167,3 @@ for epoch in range(initial_epoch, num_epochs):
 
     LOGGER.info(f"Running validation for epoch {epoch}")
     run_validation(model, device, val_dataloader, criterion, val_dataset, batch_size, writer, epoch)
-    LOGGER.info(f"Running test for epoch {epoch}")
-    run_test(model, device, test_dataloader, test_data_vis_dir, n_classes_model, rings_per_bubble, points_per_ring,
-             ring_padding)
-

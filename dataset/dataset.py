@@ -75,11 +75,12 @@ class TokenizedBubbleDataset(Dataset):
 
 class TrainingBubblesCreator:
     def __init__(self, max_points_per_bubble, points_per_ring, rings_per_bubble, n_point_features, model_resolution,
-                 n_classes_model, ignore_index, ring_padding):
+                 n_classes_model, ignore_index, ring_padding, extra_rings_for_last_ring_padding):
         assert ring_padding >= 0
 
         self.max_points_per_bubble = max_points_per_bubble
-        self.max_points_sampled_per_bubble = int(max_points_per_bubble * (1 + ring_padding))
+        self.max_points_sampled_per_bubble = \
+            int(points_per_ring * (rings_per_bubble + extra_rings_for_last_ring_padding))
         assert self.max_points_sampled_per_bubble >= max_points_per_bubble
 
         self.points_per_ring = points_per_ring
@@ -88,6 +89,8 @@ class TrainingBubblesCreator:
         self.sparse_points_per_ring = points_per_ring - self.dense_points_per_ring
 
         self.rings_per_bubble = rings_per_bubble
+        self.extra_rings_for_last_ring_padding = extra_rings_for_last_ring_padding
+        self.total_rings_per_bubble = rings_per_bubble + extra_rings_for_last_ring_padding
         self.n_point_features = n_point_features
         self.model_resolution = model_resolution
         self.n_classes_model = n_classes_model
@@ -152,12 +155,12 @@ class TrainingBubblesCreator:
 
         classification = classification[indices.flatten()]
 
-        point_tokens = np.zeros((self.rings_per_bubble, self.points_per_ring, self.n_point_features))
-        label_tokens = np.zeros((self.rings_per_bubble, self.points_per_ring))
+        point_tokens = np.zeros((self.total_rings_per_bubble, self.points_per_ring, self.n_point_features))
+        label_tokens = np.zeros((self.total_rings_per_bubble, self.points_per_ring))
 
         n_valid_rings = math.floor(len(points)/self.points_per_ring)
-        if n_valid_rings >= self.rings_per_bubble:
-            n_valid_rings = self.rings_per_bubble
+        if n_valid_rings >= self.total_rings_per_bubble:
+            n_valid_rings = self.total_rings_per_bubble
 
         if n_valid_rings > self.rings_per_bubble:
             n_missing_rings = 0
@@ -210,4 +213,4 @@ class TrainingBubblesCreator:
 
             label_tokens[i, self.dense_points_per_ring:] = self.ignore_index
 
-        return point_tokens, label_tokens, n_missing_rings
+        return point_tokens[0:self.rings_per_bubble, :, :], label_tokens[0:self.rings_per_bubble, :], n_missing_rings
