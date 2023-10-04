@@ -3,14 +3,14 @@ import datetime
 
 
 def get_config():
-    rings_per_bubble = 2
-    points_per_ring = 50_000
+    rings_per_bubble = 3
+    points_per_ring = 150_000
 
     return\
         {
             "model_resolution": 0.5,
             "n_classes_model": 7,
-            "d_ring_embedding": 32,
+            "d_ring_embedding": 128,
             "n_extracted_point_features": 16,
             "n_point_features": 3,  # x, y, z
             "points_per_ring": points_per_ring,
@@ -24,9 +24,12 @@ def get_config():
             "ring_padding": 0.1,
 
             # Train config
+            "min_rings_per_laz": rings_per_bubble + 1,
+            "grid_resolution": 120.0,
             "laz_data_dir": "data/laz-data/",
             "bubble_data_dir": "data/bubbles/",
             "test_data_vis_dir": "data/test-data-vis/",
+
             "batch_size": 1,
             "learning_rate": 0.001,
             "model_folder": "train-artefacts/model-checkpoints/",

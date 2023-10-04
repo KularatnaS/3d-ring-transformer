@@ -28,6 +28,8 @@ ignore_index = config["ignore_index"]
 ring_padding = config["ring_padding"]
 laz_data_dir = config["laz_data_dir"]
 bubble_data_dir = config["bubble_data_dir"]
+min_rings_per_laz = config["min_rings_per_laz"]
+grid_resolution = config["grid_resolution"]
 
 bubbles_creator = \
     TrainingBubblesCreator(max_points_per_bubble=max_points_per_bubble, points_per_ring=points_per_ring,
@@ -36,16 +38,14 @@ bubbles_creator = \
                            ignore_index=ignore_index, ring_padding=ring_padding,
                            extra_rings_for_last_ring_padding=extra_rings_for_last_ring_padding)
 
-grid_resolution = 120.0
-min_rings_per_laz = rings_per_bubble + extra_rings_for_last_ring_padding
-
 # clean train, val and test data directories
 train_bubbles_dir = os.path.join(bubble_data_dir, 'train-bubbles')
 test_bubbles_dir = os.path.join(bubble_data_dir, 'test-bubbles')
 val_bubbles_dir = os.path.join(bubble_data_dir, 'val-bubbles')
 for directory in [train_bubbles_dir, test_bubbles_dir, val_bubbles_dir]:
     for file in os.listdir(directory):
-        os.remove(os.path.join(directory, file))
+        if file.endswith(".pt"):
+            os.remove(os.path.join(directory, file))
 
 
 # train data
@@ -63,11 +63,11 @@ bubbles_creator.run(input_data_dir=os.path.join(laz_data_dir, 'val-data'),
                     output_data_dir=val_bubbles_dir,
                     grid_resolution=grid_resolution, min_rings_per_laz=min_rings_per_laz)
 
-bubble_path = 'data/bubbles/train-bubbles/5080_54435_out_30.pt'
-bubble_to_laz_file(bubble_path, 'view_clas.laz', ignore_index=ignore_index, n_classes_model=n_classes_model)
-rings_to_laz_file(bubble_path, 'view_rings.laz')
-visualise_individual_ring(bubble_path, 'view_ring_0.laz', ring_index=0)
-visualise_individual_ring(bubble_path, 'view_ring_1.laz', ring_index=1)
+# bubble_path = 'data/bubbles/train-bubbles/5190_54400_out_30.pt'
+# bubble_to_laz_file(bubble_path, 'view_clas.laz', ignore_index=ignore_index, n_classes_model=n_classes_model)
+# rings_to_laz_file(bubble_path, 'view_rings.laz')
+# visualise_individual_ring(bubble_path, 'view_ring_0.laz', ring_index=0)
+# visualise_individual_ring(bubble_path, 'view_ring_1.laz', ring_index=1)
 
 # # dummy train data_generator
 # point_tokens = np.random.uniform(low=-100.0, high=100.0, size=(rings_per_bubble, points_per_ring, n_point_features))

@@ -92,9 +92,8 @@ class TrainingBubblesCreator:
 
     def run(self, input_data_dir, output_data_dir, grid_resolution, min_rings_per_laz=3):
         # check if output directory exists, and if so, delete it and recreate it
-        if os.path.exists(output_data_dir):
-            shutil.rmtree(output_data_dir)
-        os.mkdir(output_data_dir)
+        if not os.path.exists(output_data_dir):
+            os.mkdir(output_data_dir)
 
         laz_files = glob.glob(os.path.join(input_data_dir, "*.laz"))
         for laz_file in laz_files:

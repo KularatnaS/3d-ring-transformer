@@ -11,11 +11,11 @@ into a bubble, and then splitting this bubble of points into a sequence of 3D co
 - Ubuntu 20.04
 - CUDA 12.0
 - Python 3.8
-- 4 GB NVIDIA GeForce GTX 1050
+- 16 GB NVIDIA GPU
 
 ## Quick start guide
 - Install project requirements in a python 3.8.x virtual environment
-- Set config at `config/config.py`
+- Set config at `config/config.py` [default values are set for training on the DALES dataset]
 - Place your labelled point cloud data in .laz format at:
   - `data/laz-data/train-data`
   - `data/laz-data/val-data`
@@ -43,4 +43,4 @@ dataset, and model performance metrics on the test dataset (12.5% of the dataset
 
 
 ### An example segmentation run using the model:
-![Example classification](./images/ex-1.png)
+![Example classification](./images/segmentation-example.png)
