@@ -20,7 +20,7 @@ into a bubble, and then splitting this bubble of points into a sequence of 3D co
   - `data/laz-data/train-data`
   - `data/laz-data/val-data`
   - `data/laz-data/test-data`
-- Run `train_data_generator.py` to generate training data. Training data will be stored at 
+- Run `train_data_generator.py` to generate training data. Training data will be stored at: 
   - `data/bubbles/train-bubbles`
   - `data/bubbles/val-bubbles`
   - `data/bubbles/test-bubbles`
