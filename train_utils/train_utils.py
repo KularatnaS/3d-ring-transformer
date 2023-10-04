@@ -39,8 +39,8 @@ def update_metrics_for_f1_score_calculation(n_classes_model, gt_semantic_labels,
                                               n_TP_points_current_class_and_bubble)
 
 
-def calculate_per_class_f1_score(n_classes_model, n_TP_semantic_labels_per_class, n_FP_semantic_labels_per_class,
-                                    n_FN_semantic_labels_per_class):
+def calculate_per_class_performance_metrics(n_classes_model, n_TP_semantic_labels_per_class,
+                                            n_FP_semantic_labels_per_class, n_FN_semantic_labels_per_class):
 
     per_class_f1_score = np.zeros(n_classes_model)
     per_class_semantic_precision = np.zeros(n_classes_model)
@@ -57,7 +57,7 @@ def calculate_per_class_f1_score(n_classes_model, n_TP_semantic_labels_per_class
             per_class_f1_score[n] = (2 * per_class_semantic_precision[n] * per_class_semantic_recall[n]) / \
                                     (per_class_semantic_precision[n] + per_class_semantic_recall[n])
 
-    return per_class_f1_score
+    return per_class_f1_score, per_class_semantic_precision, per_class_semantic_recall
 
 
 def run_test(model, device, test_dataloader, test_data_vis_dir, n_classes_model, rings_per_bubble, points_per_ring,
@@ -94,10 +94,13 @@ def run_test(model, device, test_dataloader, test_data_vis_dir, n_classes_model,
                                                     n_TP_semantic_labels_per_class, n_FP_semantic_labels_per_class,
                                                     n_FN_semantic_labels_per_class)
 
-    per_class_f1_score = calculate_per_class_f1_score(n_classes_model, n_TP_semantic_labels_per_class,
-                                                        n_FP_semantic_labels_per_class,
-                                                      n_FN_semantic_labels_per_class)
+    per_class_f1_score, per_class_semantic_precision, per_class_semantic_recall \
+        = calculate_per_class_performance_metrics(n_classes_model, n_TP_semantic_labels_per_class,
+                                                  n_FP_semantic_labels_per_class, n_FN_semantic_labels_per_class)
+
     LOGGER.info(f"per_class_f1_score: {np.around(per_class_f1_score, 2)}")
+    LOGGER.info(f"per_class_semantic_precision: {np.around(per_class_semantic_precision, 2)}")
+    LOGGER.info(f"per_class_semantic_recall: {np.around(per_class_semantic_recall, 2)}")
 
 
 def run_validation(model, device, val_dataloader, criterion, val_dataset, batch_size, writer, epoch):

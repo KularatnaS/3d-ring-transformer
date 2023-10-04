@@ -1,5 +1,8 @@
 import os
-import datetime
+from einops import rearrange
+import numpy as np
+import math
+from tqdm import tqdm
 
 import torch.nn
 from torch.utils.data import DataLoader
@@ -9,15 +12,8 @@ from dataset.dataset import collate_fn, TokenizedBubbleDataset
 from config.config import get_config, get_weights_file_path
 from model.model import build_classification_model
 from dataset.datautils import save_as_laz_file
-
-from einops import rearrange
-import numpy as np
-import math
-
 from train_utils.train_utils import run_validation
 from train_utils.bubble_augmenter import BatchAugmenter
-
-from tqdm import tqdm
 
 import logging
 LOGGER = logging.getLogger(__name__)
@@ -117,15 +113,8 @@ for epoch in range(initial_epoch, num_epochs):
         # data batch
         data = batch[0]
         if augment_train_data:
-            # labels_temp = rearrange(batch[1], 'a b c -> (a b c)')
-            # save_as_laz_file(points=rearrange(data, '1 a b c -> (a b) c').numpy(), classification=labels_temp, filename='aug-before.laz')
-
             batch_augmenter = BatchAugmenter(data, model_resolution)
             data = batch_augmenter.augment()
-
-            # all_points = rearrange(data, '1 a b c -> (a b) c')
-            # save_as_laz_file(points=all_points.numpy(), classification=labels_temp, filename='aug-after.laz')
-            # raise Exception('stop')
         data = data.to(device)
 
         labels = batch[1].type(torch.LongTensor).to(device)

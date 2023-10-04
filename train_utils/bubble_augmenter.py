@@ -41,7 +41,7 @@ class BatchAugmenter:
 
     def recentre_bubble(self, bubble):
         mid_point = (np.amax(bubble, axis=0)[0:3] + np.amin(bubble, axis=0)[0:3]) / 2.0
-        bubble -= mid_point
+        bubble[:, 0:3] -= mid_point
         return bubble
 
     def jitter_bubble(self, bubble):

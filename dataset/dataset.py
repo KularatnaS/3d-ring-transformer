@@ -60,13 +60,6 @@ class TokenizedBubbleDataset(Dataset):
         label_tokens = data[1]
         label_tokens = torch.from_numpy(label_tokens.astype(np.float32))
 
-        # # one hot encode labels
-        # for counter, label_token in enumerate(label_tokens):
-        #     one_hot_encoded_matrix = np.zeros((len(label_token), self.n_classes_model))
-        #     if counter < self.rings_per_bubble - n_missing_rings:
-        #         one_hot_encoded_matrix[range(len(label_token)), label_token.astype(int)] = 1
-        #     label_tokens_one_hot_encoded.append(one_hot_encoded_matrix.astype(np.float32))
-
         return point_tokens, label_tokens, encoder_mask
 
     def __len__(self):

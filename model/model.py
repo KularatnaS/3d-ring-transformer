@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 from model.spconv_unet_ring_embedding import RingEmbedding
 
@@ -10,6 +9,7 @@ from einops import rearrange
 import logging
 
 LOGGER = logging.getLogger(__name__)
+
 
 class PositionalEncoding(nn.Module):
 
